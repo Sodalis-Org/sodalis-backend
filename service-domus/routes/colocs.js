@@ -104,7 +104,7 @@ router.post('/join',
 // GET /colocs/:id/users — Membres d'une coloc
 router.get('/:id/users', auth, async (req, res) => {
     const { rows } = await pool.query(
-        'SELECT id, name, email, role, created_at FROM users WHERE coloc_id = $1',
+        'SELECT id, name, email, role, harmony_score, created_at FROM users WHERE coloc_id = $1',
         [req.params.id],
     );
 

@@ -10,6 +10,7 @@ const pinoHttp = require('pino-http');
 const logger = require('./logger');
 const Notification = require('./models/Notification');
 const auth = require('./middleware/auth');
+const socialRoutes = require('./routes/social');
 
 const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:3000';
 
@@ -20,6 +21,8 @@ app.use(express.json());
 
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: CORS_ORIGIN } });
+
+app.use('/api', auth, socialRoutes(io));
 
 // ── MongoDB ──────────────────────────────────────────────────
 mongoose.connect(process.env.MONGO_URL || 'mongodb://localhost:27017/concordia_db')

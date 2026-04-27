@@ -16,9 +16,10 @@ router.post('/',
     body('title').trim().isLength({ min: 1, max: 150 }).withMessage('Titre requis (1-150 caractères)'),
     body('assignee_id').isUUID().withMessage('assignee_id doit être un UUID valide'),
     body('coloc_id').isUUID().withMessage('coloc_id doit être un UUID valide'),
+    body('due_at').optional({ nullable: true }).isISO8601().withMessage('due_at doit être une date ISO 8601 valide'),
     validate,
     async (req, res) => {
-        const { title, assignee_id, coloc_id } = req.body;
+        const { title, assignee_id, coloc_id, due_at } = req.body;
 
         const { is_valid, message } = await verifyUser({ user_id: assignee_id, coloc_id });
 
@@ -27,8 +28,8 @@ router.post('/',
         }
 
         const { rows } = await pool.query(
-            'INSERT INTO tasks (title, assignee_id, coloc_id) VALUES ($1, $2, $3) RETURNING *',
-            [title, assignee_id, coloc_id],
+            'INSERT INTO tasks (title, assignee_id, coloc_id, due_at) VALUES ($1, $2, $3, $4) RETURNING *',
+            [title, assignee_id, coloc_id, due_at || null],
         );
 
         await publisher.publish('sodalis_events', JSON.stringify({
@@ -53,7 +54,7 @@ router.patch('/:id/status',
         const { status } = req.body;
 
         const { rows } = await pool.query(
-            'SELECT id, coloc_id, title FROM tasks WHERE id = $1',
+            'SELECT id, coloc_id, title, assignee_id, due_at, status FROM tasks WHERE id = $1',
             [req.params.id],
         );
 
@@ -79,6 +80,19 @@ router.patch('/:id/status',
             status,
             message: `Tâche "${task.title}" mise à jour : ${status}`,
         }));
+
+        if (status === 'DONE' && task.status !== 'DONE') {
+            const is_on_time = task.due_at ? (new Date() <= new Date(task.due_at)) : false;
+            const points = is_on_time ? 10 : 2;
+            await publisher.publish('sodalis_events', JSON.stringify({
+                type: 'TASK_COMPLETED_SCORE_UPDATE',
+                user_id: task.assignee_id,
+                coloc_id: task.coloc_id,
+                is_on_time,
+                points,
+                message: 'Score harmony mis à jour',
+            }));
+        }
 
         await publisher.del(`dashboard_coloc_${task.coloc_id}`);
 

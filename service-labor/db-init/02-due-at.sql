@@ -1,0 +1,6 @@
+BEGIN;
+
+ALTER TABLE tasks
+    ADD COLUMN due_at TIMESTAMPTZ;
+
+COMMIT;

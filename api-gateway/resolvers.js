@@ -52,6 +52,28 @@ const resolvers = {
             return data.data || data;
         },
 
+        complaints: async (_, { colocId }, { user, req }) => {
+            if (!user || (user.role !== 'ADMIN' && user.coloc_id !== colocId)) {
+                throw new Error('Non autorisé — Vous n\'appartenez pas à cette colocation');
+            }
+            const { data } = await axios.get(
+                `${CONCORDIA_URL}/api/complaints?coloc_id=${colocId}`,
+                { headers: { Authorization: req.headers.authorization } },
+            );
+            return data;
+        },
+
+        polls: async (_, { colocId }, { user, req }) => {
+            if (!user || (user.role !== 'ADMIN' && user.coloc_id !== colocId)) {
+                throw new Error('Non autorisé — Vous n\'appartenez pas à cette colocation');
+            }
+            const { data } = await axios.get(
+                `${CONCORDIA_URL}/api/polls?coloc_id=${colocId}`,
+                { headers: { Authorization: req.headers.authorization } },
+            );
+            return data;
+        },
+
         getColocDashboard: async (_, { colocId }, { user, req }) => {
             if (!user || (user.role !== 'ADMIN' && user.coloc_id !== colocId)) {
                 throw new Error('Non autorisé — Vous n\'appartenez pas à cette colocation');
@@ -67,11 +89,14 @@ const resolvers = {
 
             logger.info('Cache miss — appel des microservices...');
 
-            const [usersRes, tasksRes] = await Promise.all([
+            const [usersRes, tasksRes, complaintsRes] = await Promise.all([
                 axios.get(`${DOMUS_URL}/colocs/${colocId}/users`, {
                     headers: { Authorization: req.headers.authorization },
                 }),
                 axios.get(`${LABOR_URL}/tasks/coloc/${colocId}`, {
+                    headers: { Authorization: req.headers.authorization },
+                }),
+                axios.get(`${CONCORDIA_URL}/api/complaints?coloc_id=${colocId}&status=OPEN`, {
                     headers: { Authorization: req.headers.authorization },
                 }),
             ]);
@@ -79,6 +104,7 @@ const resolvers = {
             const dashboard = {
                 users: usersRes.data,
                 tasks: tasksRes.data.data || tasksRes.data,
+                open_complaints: complaintsRes.data.length,
             };
 
             await cache.setEx(cacheKey, CACHE_TTL, JSON.stringify(dashboard));
@@ -117,10 +143,10 @@ const resolvers = {
             return data;
         },
 
-        createTask: async (_, { title, assignee_id, coloc_id }, { req }) => {
+        createTask: async (_, { title, assignee_id, coloc_id, due_at }, { req }) => {
             const { data } = await axios.post(
                 `${LABOR_URL}/tasks`,
-                { title, assignee_id, coloc_id },
+                { title, assignee_id, coloc_id, due_at },
                 { headers: { Authorization: req.headers.authorization } },
             );
             return data;
@@ -163,6 +189,59 @@ const resolvers = {
             const { data } = await axios.patch(
                 `${DOMUS_URL}/maintenance/${id}/assign`,
                 { assigned_to },
+                { headers: { Authorization: req.headers.authorization } },
+            );
+            await cache.del(`dashboard_coloc_${data.coloc_id}`);
+            return data;
+        },
+
+        createComplaint: async (_, { coloc_id, message, target_id, is_anonymous }, { user, req }) => {
+            if (!user) throw new Error('Non autorisé');
+            const { data } = await axios.post(
+                `${CONCORDIA_URL}/api/complaints`,
+                { coloc_id, message, target_id, is_anonymous },
+                { headers: { Authorization: req.headers.authorization } },
+            );
+            await cache.del(`dashboard_coloc_${coloc_id}`);
+            return data;
+        },
+
+        deleteComplaint: async (_, { id }, { user, req }) => {
+            if (!user) throw new Error('Non autorisé');
+            await axios.delete(
+                `${CONCORDIA_URL}/api/complaints/${id}`,
+                { headers: { Authorization: req.headers.authorization } },
+            );
+            return true;
+        },
+
+        resolveComplaint: async (_, { id }, { user, req }) => {
+            if (!user) throw new Error('Non autorisé');
+            const { data } = await axios.patch(
+                `${CONCORDIA_URL}/api/complaints/${id}/resolve`,
+                {},
+                { headers: { Authorization: req.headers.authorization } },
+            );
+            await cache.del(`dashboard_coloc_${data.coloc_id}`);
+            return data;
+        },
+
+        createPoll: async (_, { coloc_id, question, options }, { user, req }) => {
+            if (!user) throw new Error('Non autorisé');
+            const { data } = await axios.post(
+                `${CONCORDIA_URL}/api/polls`,
+                { coloc_id, question, options },
+                { headers: { Authorization: req.headers.authorization } },
+            );
+            await cache.del(`dashboard_coloc_${coloc_id}`);
+            return data;
+        },
+
+        votePoll: async (_, { poll_id, option_id }, { user, req }) => {
+            if (!user) throw new Error('Non autorisé');
+            const { data } = await axios.post(
+                `${CONCORDIA_URL}/api/polls/${poll_id}/vote`,
+                { option_id },
                 { headers: { Authorization: req.headers.authorization } },
             );
             await cache.del(`dashboard_coloc_${data.coloc_id}`);

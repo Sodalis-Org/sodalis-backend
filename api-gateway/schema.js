@@ -5,6 +5,7 @@ const typeDefs = `#graphql
     email: String!
     role: String!
     coloc_id: ID
+    harmony_score: Int!
   }
 
   type AuthPayload {
@@ -56,11 +57,13 @@ const typeDefs = `#graphql
     assignee_id: ID!
     coloc_id: ID!
     created_at: String
+    due_at: String
   }
 
   type Dashboard {
     users: [User]
     tasks: [Task]
+    open_complaints: Int
   }
 
   type MaintenanceTicket {
@@ -77,12 +80,41 @@ const typeDefs = `#graphql
     updated_at: String
   }
 
+  type Complaint {
+    id: ID!
+    coloc_id: ID!
+    creator_id: ID
+    target_id: ID
+    message: String!
+    is_anonymous: Boolean!
+    status: String!
+    createdAt: String
+  }
+
+  type PollOption {
+    option_id: ID!
+    text: String!
+    voters: [ID]
+  }
+
+  type Poll {
+    id: ID!
+    coloc_id: ID!
+    creator_id: ID!
+    question: String!
+    options: [PollOption]
+    status: String!
+    createdAt: String
+  }
+
   type Query {
     usersByColoc(colocId: ID!): [User]
     tasksByColoc(colocId: ID!): [Task]
     getColocDashboard(colocId: ID!): Dashboard
     maintenanceTickets(colocId: ID!): [MaintenanceTicket]
     notifications(colocId: ID!, page: Int, limit: Int): NotificationsResult
+    complaints(colocId: ID!): [Complaint]
+    polls(colocId: ID!): [Poll]
   }
 
   type Mutation {
@@ -90,7 +122,7 @@ const typeDefs = `#graphql
     login(email: String!, password: String!): AuthPayload
     createColoc(name: String!): ColocWithToken
     joinColoc(invite_code: String!): ColocWithToken
-    createTask(title: String!, assignee_id: ID!, coloc_id: ID!): Task
+    createTask(title: String!, assignee_id: ID!, coloc_id: ID!, due_at: String): Task
     updateTaskStatus(id: ID!, status: String!): Task
     createMaintenanceTicket(
       title: String!
@@ -101,6 +133,11 @@ const typeDefs = `#graphql
     ): MaintenanceTicket
     updateTicketStatus(id: ID!, status: String!): MaintenanceTicket
     assignTicket(id: ID!, assigned_to: ID!): MaintenanceTicket
+    createComplaint(coloc_id: ID!, message: String!, target_id: ID, is_anonymous: Boolean): Complaint
+    resolveComplaint(id: ID!): Complaint
+    deleteComplaint(id: ID!): Boolean
+    createPoll(coloc_id: ID!, question: String!, options: [String!]!): Poll
+    votePoll(poll_id: ID!, option_id: ID!): Poll
   }
 `;
 

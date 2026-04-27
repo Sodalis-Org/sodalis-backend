@@ -9,6 +9,7 @@ const usersRouter = require('./routes/users');
 const authRouter = require('./routes/auth');
 const startGrpcServer = require('./grpc-server');
 const publisher = require('./redis-publisher');
+const subscriber = require('./redis-subscriber');
 const maintenanceRouter = require('./routes/maintenance');
 
 const app = express();
@@ -53,6 +54,7 @@ async function shutdown(signal) {
     await new Promise((resolve) => server.close(resolve));
     await pool.end();
     await publisher.quit();
+    await subscriber.quit();
     logger.info('Shutdown complet');
     process.exit(0);
 }
