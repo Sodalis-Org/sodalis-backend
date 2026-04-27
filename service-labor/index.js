@@ -6,6 +6,7 @@ const logger = require('./logger');
 const pool = require('./db');
 const publisher = require('./redis-publisher');
 const tasksRouter = require('./routes/tasks');
+const startGrpcServer = require('./grpc-server');
 
 const app = express();
 
@@ -36,7 +37,10 @@ app.use((err, _req, res, _next) => {
 });
 
 const PORT = process.env.PORT || 3002;
-const server = app.listen(PORT, () => logger.info(`Service Labor démarré → http://localhost:${PORT}`));
+const server = app.listen(PORT, () => {
+    logger.info(`Service Labor démarré → http://localhost:${PORT}`);
+    startGrpcServer();
+});
 
 async function shutdown(signal) {
     logger.info({ signal }, 'Arrêt en cours...');

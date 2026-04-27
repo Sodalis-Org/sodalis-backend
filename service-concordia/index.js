@@ -58,6 +58,18 @@ subscriber.connect().then(async () => {
                 ...(event.status  && { status: event.status }),
             });
         }
+
+        const MAINTENANCE_EVENTS = ['NEW_MAINTENANCE_TICKET', 'MAINTENANCE_TICKET_UPDATED', 'MAINTENANCE_TICKET_ASSIGNED'];
+        if (MAINTENANCE_EVENTS.includes(event.type)) {
+            io.emit(`coloc_${event.coloc_id}_notifications`, {
+                type: event.type,
+                message: event.message,
+                ...(event.ticket_id   && { ticket_id: event.ticket_id }),
+                ...(event.priority    && { priority: event.priority }),
+                ...(event.status      && { status: event.status }),
+                ...(event.assigned_to && { assigned_to: event.assigned_to }),
+            });
+        }
     });
 });
 

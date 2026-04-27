@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package labor;
+
+service LaborService {
+    rpc CreateTask (CreateTaskRequest) returns (CreateTaskResponse);
+}
+
+message CreateTaskRequest {
+    string title       = 1;
+    string assignee_id = 2;
+    string coloc_id    = 3;
+}
+
+message CreateTaskResponse {
+    string task_id = 1;
+    string title   = 2;
+    string status  = 3;
+}

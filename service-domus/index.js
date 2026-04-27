@@ -8,6 +8,8 @@ const colocsRouter = require('./routes/colocs');
 const usersRouter = require('./routes/users');
 const authRouter = require('./routes/auth');
 const startGrpcServer = require('./grpc-server');
+const publisher = require('./redis-publisher');
+const maintenanceRouter = require('./routes/maintenance');
 
 const app = express();
 
@@ -17,6 +19,7 @@ app.use(express.json());
 app.use('/auth', authRouter);
 app.use('/colocs', colocsRouter);
 app.use('/users', usersRouter);
+app.use('/maintenance', maintenanceRouter);
 
 app.get('/health', async (_req, res) => {
     try {
@@ -49,6 +52,7 @@ async function shutdown(signal) {
     logger.info({ signal }, 'Arrêt en cours...');
     await new Promise((resolve) => server.close(resolve));
     await pool.end();
+    await publisher.quit();
     logger.info('Shutdown complet');
     process.exit(0);
 }

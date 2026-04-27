@@ -108,10 +108,14 @@ services:
       GRPC_PORT: 50051
       DATABASE_URL: postgres://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD}@domus-db:5432/${POSTGRES_DB:-domus_db}
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
+      REDIS_URL: redis://redis:6379
+      LABOR_GRPC_URL: service-labor:50052
     ports:
       - "3001:3001"
     depends_on:
       domus-db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     networks:
       - sodalis-net
@@ -128,6 +132,7 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD}@labor-db:5432/labor_db
       REDIS_URL: redis://redis:6379
       DOMUS_GRPC_URL: service-domus:50051
+      LABOR_GRPC_PORT: 50052
     ports:
       - "3002:3002"
     depends_on:
@@ -172,12 +177,15 @@ services:
       REDIS_URL: redis://redis:6379
       DOMUS_URL: http://service-domus:3001
       LABOR_URL: http://service-labor:3002
+      CONCORDIA_URL: http://service-concordia:3003
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
     ports:
       - "4000:4000"
     depends_on:
       redis:
         condition: service_healthy
+      service-concordia:
+        condition: service_started
     networks:
       - sodalis-net
 

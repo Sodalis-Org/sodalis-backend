@@ -1,105 +1,452 @@
-# 🧪 Guide de Test Complet : Sodalis Backend
+# Guide de test manuel — Sodalis Backend
 
-Ce tutoriel te guide à travers un scénario complet pour tester toutes les fonctionnalités : Authentification JWT, Mutations GraphQL, gRPC, Cache Redis et Notifications persistées.
+Scénario complet pour tester toutes les fonctionnalités : Auth, GraphQL, gRPC, Redis cache, tickets de maintenance, notifications temps réel.
 
----
-
-## 🚀 Étape 1 : Préparation
-
-1. **Vider les bases** (Déjà fait par mes soins) : Les bases PostgreSQL, MongoDB et Redis sont propres.
-2. **Lancer les services** : Assure-toi que les 4 services tournent (`npm run dev`) :
-   - Domus (3001)
-   - Labor (3002)
-   - Concordia (3003)
-   - Gateway (4000)
+**Outils nécessaires :** `curl`, un navigateur pour l'IDE GraphQL, et optionnellement un client Socket.io (ex: [socket.io-client REPL](https://npm.runkit.com/socket.io-client) ou Postman).
 
 ---
 
-## 🔐 Étape 2 : Authentification (REST - Domus)
-
-On commence par créer un compte et récupérer un jeton de sécurité (**JWT**).
+## Étape 0 — Démarrage
 
 ```bash
-# 1. Inscription
-curl -X POST http://localhost:3001/auth/register \
--H "Content-Type: application/json" \
--d '{"name": "Leo", "email": "leo@test.com", "password": "password123"}'
-
-# 2. Connexion pour récupérer le Token
-curl -X POST http://localhost:3001/auth/login \
--H "Content-Type: application/json" \
--d '{"email": "leo@test.com", "password": "password123"}'
+docker-compose down -v && docker-compose up -d --build
 ```
-> [!IMPORTANT]
-> Copie le `token` reçu dans la réponse de login. Tu devras l'utiliser dans toutes les étapes suivantes via le header `Authorization: Bearer <TON_TOKEN>`.
+
+Attendre ~20 secondes, puis vérifier que tout est up :
+
+```bash
+docker-compose ps
+```
+
+Tous les services doivent être en état `running` (healthy pour les bases).
 
 ---
 
-## 🏗️ Étape 3 : Création de données via GraphQL (Gateway)
+## Étape 1 — Créer deux utilisateurs
 
-Rends-toi sur [http://localhost:4000/graphql](http://localhost:4000/graphql).
-Ajoute ton token dans l'onglet **HTTP HEADERS** en bas :
+On a besoin d'un **ADMIN** et d'un **MEMBER** pour tester les restrictions de rôle.
+
+### 1.1 Créer l'ADMIN
+
+```bash
+curl -s -X POST http://localhost:3001/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Alice", "email": "alice@test.com", "password": "password123"}' | jq
+```
+
+**Réponse attendue :**
 ```json
 {
-  "Authorization": "Bearer <TON_TOKEN_ICI>"
+  "id": "<UUID_ALICE>",
+  "name": "Alice",
+  "email": "alice@test.com",
+  "role": "MEMBER"
 }
 ```
 
-### 1. Créer une Colocation (Mutation)
-Exécute cette mutation :
+> Sauvegarde `<UUID_ALICE>`. Le register ne génère pas de token — il faut se connecter ensuite.
+
+```bash
+curl -s -X POST http://localhost:3001/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "alice@test.com", "password": "password123"}' | jq
+```
+
+**Réponse attendue :**
+```json
+{
+  "token": "eyJ...",
+  "user": { "id": "<UUID_ALICE>", "name": "Alice", "email": "alice@test.com", "role": "MEMBER" }
+}
+```
+
+> Sauvegarde le `token` → **TOKEN_ALICE**.
+
+### 1.2 Créer le MEMBER
+
+```bash
+curl -s -X POST http://localhost:3001/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Bob", "email": "bob@test.com", "password": "password123"}' | jq
+```
+
+Puis login :
+
+```bash
+curl -s -X POST http://localhost:3001/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "bob@test.com", "password": "password123"}' | jq
+```
+
+> Sauvegarde `<UUID_BOB>` et le `token` → **TOKEN_BOB**.
+
+---
+
+## Étape 2 — Créer une colocation
+
+Alice crée la coloc depuis l'API Gateway (GraphQL).
+
+Ouvre **http://localhost:4000/graphql** dans ton navigateur.
+
+Dans l'onglet **HTTP Headers** (en bas), colle :
+```json
+{ "Authorization": "Bearer TOKEN_ALICE" }
+```
+
+Exécute :
 ```graphql
-mutation CreateColoc($name: String!) {
-  createColoc(name: $name) {
-    id
-    name
-    invite_code
+mutation {
+  createColoc(name: "Appart Lyon") {
+    coloc {
+      id
+      name
+      invite_code
+    }
+    token
   }
 }
 ```
-*(Variables: `{"name": "Appartement Lyon"}`)*. Note l'ID de la coloc retourné.
 
-### 2. Créer une Tâche (Mutation)
-Cela va tester **GraphQL -> Labor -> Domus (gRPC)** :
+**Réponse attendue :**
+```json
+{
+  "data": {
+    "createColoc": {
+      "coloc": { "id": "<UUID_COLOC>", "name": "Appart Lyon", "invite_code": "appart-lyon-xxxx" },
+      "token": "eyJ..."
+    }
+  }
+}
+```
+
+> La réponse contient un **nouveau token** mis à jour (il contient maintenant le `coloc_id`). Remplace **TOKEN_ALICE** par ce nouveau token.
+> Sauvegarde `<UUID_COLOC>` et le `invite_code`.
+
+**Ce qui s'est passé :** Alice est maintenant ADMIN de cette coloc.
+
+---
+
+## Étape 3 — Bob rejoint la colocation
+
+Dans l'IDE GraphQL, change le header pour utiliser **TOKEN_BOB**, puis :
+
 ```graphql
-mutation CreateTask($title: String!, $assignee_id: ID!, $coloc_id: ID!) {
-  createTask(title: $title, assignee_id: $assignee_id, coloc_id: $coloc_id) {
+mutation {
+  joinColoc(invite_code: "appart-lyon-xxxx") {
+    coloc {
+      id
+      name
+    }
+    token
+  }
+}
+```
+
+> Remplace **TOKEN_BOB** par le nouveau token reçu.
+
+**Ce qui s'est passé :** Bob est maintenant MEMBER de la même coloc.
+
+---
+
+## Étape 4 — Créer une tâche
+
+Teste le flux **GraphQL → service-labor → gRPC VerifyUser → service-domus**.
+
+Avec **TOKEN_ALICE** dans le header :
+
+```graphql
+mutation {
+  createTask(
+    title: "Acheter du papier toilette"
+    assignee_id: "<UUID_BOB>"
+    coloc_id: "<UUID_COLOC>"
+  ) {
+    id
+    title
+    status
+  }
+}
+```
+
+**Réponse attendue :**
+```json
+{
+  "data": {
+    "createTask": {
+      "id": "<UUID_TASK>",
+      "title": "Acheter du papier toilette",
+      "status": "TODO"
+    }
+  }
+}
+```
+
+**Ce qui s'est passé en coulisses :**
+1. La gateway a appelé `POST /tasks` sur service-labor
+2. Service-labor a appelé `VerifyUser` sur service-domus via gRPC → confirmé que Bob appartient à la coloc
+3. La tâche a été insérée en base
+4. L'événement `NEW_TASK` a été publié sur Redis
+5. Service-concordia a persisté une notification en MongoDB
+
+**Test d'erreur gRPC :** Essaie avec un `assignee_id` inventé (n'importe quel UUID) — tu dois recevoir `403 Non autorisé`.
+
+---
+
+## Étape 5 — Mettre à jour le statut d'une tâche
+
+```graphql
+mutation {
+  updateTaskStatus(id: "<UUID_TASK>", status: "IN_PROGRESS") {
+    id
+    status
+  }
+}
+```
+
+**Réponse attendue :** `status: "IN_PROGRESS"`
+
+---
+
+## Étape 6 — Dashboard et cache Redis
+
+### 6.1 Premier appel (cache miss)
+
+```graphql
+query {
+  getColocDashboard(colocId: "<UUID_COLOC>") {
+    users { name }
+    tasks { title status }
+  }
+}
+```
+
+Dans les logs de la gateway (`docker logs sodalis_gateway`), tu dois voir :
+```
+Cache miss — appel des microservices...
+```
+
+### 6.2 Deuxième appel immédiat (cache hit)
+
+Relance exactement la même query. Dans les logs :
+```
+Dashboard depuis le cache Redis
+```
+
+### 6.3 Vérifier le cache dans Redis
+
+```bash
+docker exec sodalis_redis redis-cli GET "dashboard_coloc_<UUID_COLOC>"
+```
+
+Tu verras le JSON du dashboard sérialisé.
+
+---
+
+## Étape 7 — Tickets de maintenance
+
+### 7.1 Créer un ticket normal (priorité LOW)
+
+Avec **TOKEN_BOB** :
+
+```bash
+curl -s -X POST http://localhost:3001/maintenance \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer TOKEN_BOB" \
+  -d '{
+    "title": "Robinet qui fuit",
+    "description": "La cuisine, sous l évier",
+    "category": "PLUMBING",
+    "priority": "LOW",
+    "coloc_id": "<UUID_COLOC>"
+  }' | jq
+```
+
+**Réponse attendue :** `201` + ticket avec `status: "OPEN"`.
+
+Vérifie dans les logs de service-concordia (`docker logs sodalis_concordia`) :
+```
+Événement reçu type=NEW_MAINTENANCE_TICKET
+```
+
+### 7.2 Créer un ticket URGENT (escalade gRPC)
+
+```bash
+curl -s -X POST http://localhost:3001/maintenance \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer TOKEN_BOB" \
+  -d '{
+    "title": "Coupure électrique totale",
+    "category": "ELECTRICITY",
+    "priority": "URGENT",
+    "coloc_id": "<UUID_COLOC>"
+  }' | jq
+```
+
+**Réponse attendue :** `201` + ticket créé.
+
+**Ce qui s'est passé en plus :**
+- Service-domus a appelé `CreateTask` sur service-labor via gRPC
+- Une tâche "Urgence : Coupure électrique totale" a été créée automatiquement dans service-labor
+
+**Vérification :** Lance la query GraphQL `tasksByColoc` — tu dois voir la tâche d'urgence :
+
+```graphql
+query {
+  tasksByColoc(colocId: "<UUID_COLOC>") {
     id
     title
   }
 }
 ```
-*(Variables: utilise ton `user_id` de l'étape 2 et l'ID de coloc de l'étape 3.1)*.
 
----
+### 7.3 Mettre à jour le statut d'un ticket
 
-## 📊 Étape 4 : Consultations et Vérifications
+Note le `id` (entier) du ticket créé en 7.1. Avec **TOKEN_ALICE** :
 
-### 1. Dashboard (Query + Cache)
+```bash
+curl -s -X PATCH http://localhost:3001/maintenance/<ID_TICKET>/status \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer TOKEN_ALICE" \
+  -d '{"status": "IN_PROGRESS"}' | jq
+```
+
+**Réponse attendue :** ticket avec `status: "IN_PROGRESS"`.
+
+Ou via GraphQL :
 ```graphql
-query GetDashboard($colocId: ID!) {
-  getColocDashboard(colocId: $colocId) {
-    users { name }
-    tasks { title }
+mutation {
+  updateTicketStatus(id: "<ID_TICKET>", status: "IN_PROGRESS") {
+    id
+    status
   }
 }
 ```
-- **1er passage** : `Cache miss` (lent).
-- **2ème passage** : `Cache hit` (rapide).
 
-### 2. Historique des Notifications (REST - Concordia)
-Vérifie que la tâche créée a bien été persistée dans MongoDB :
+### 7.4 Assigner un ticket (ADMIN seulement)
+
+Avec **TOKEN_ALICE** (ADMIN) :
+
 ```bash
-curl -H "Authorization: Bearer <TON_TOKEN>" \
-http://localhost:3003/notifications/coloc/<ID_COLOC>
+curl -s -X PATCH http://localhost:3001/maintenance/<ID_TICKET>/assign \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer TOKEN_ALICE" \
+  -d '{"assigned_to": "<UUID_BOB>"}' | jq
 ```
 
-### 3. Temps Réel (WebSockets)
-Connecte-toi à `ws://localhost:3003` (via un outil Socket.io).
-- Écoute l'événement : `coloc_<ID_COLOC>_notifications`.
-- Crée une tâche (Étape 3.2).
-- Tu reçois la notification en direct !
+**Réponse attendue :** ticket avec `assigned_to: "<UUID_BOB>"`.
+
+**Test d'erreur de rôle :** Répète avec **TOKEN_BOB** (MEMBER) — tu dois recevoir `403 Réservé aux ADMINs`.
+
+### 7.5 Lister les tickets de la coloc
+
+Via GraphQL (TOKEN_ALICE ou TOKEN_BOB) :
+
+```graphql
+query {
+  maintenanceTickets(colocId: "<UUID_COLOC>") {
+    id
+    title
+    category
+    priority
+    status
+    assigned_to
+  }
+}
+```
+
+**Réponse attendue :** liste de tous les tickets créés.
 
 ---
 
-## 🛡️ Étape 5 : Test de Sécurité (Optionnel)
-Essaie de faire une requête GraphQL **sans le header Authorization** ou avec un **ID de coloc différent** de celui de ton profil : tu devrais recevoir une erreur `Non autorisé`.
+## Étape 8 — Notifications
+
+### 8.1 Historique MongoDB (REST)
+
+```bash
+curl -s http://localhost:3003/notifications/coloc/<UUID_COLOC> \
+  -H "Authorization: Bearer TOKEN_ALICE" | jq
+```
+
+**Réponse attendue :** liste de toutes les notifications générées depuis le début du test (`NEW_TASK`, `NEW_MAINTENANCE_TICKET`, `MAINTENANCE_TICKET_UPDATED`, `MAINTENANCE_TICKET_ASSIGNED`...).
+
+### 8.2 Notifications temps réel (Socket.io)
+
+Ouvre une console Node.js (ou [npm.runkit.com](https://npm.runkit.com)) et exécute :
+
+```javascript
+const { io } = require("socket.io-client");
+const socket = io("http://localhost:3003");
+socket.on(`coloc_<UUID_COLOC>_notifications`, (event) => {
+  console.log("Notification reçue :", event);
+});
+```
+
+Puis crée un nouveau ticket de maintenance depuis curl. Tu dois voir la notification apparaître **en temps réel** dans la console.
+
+---
+
+## Étape 9 — Tests de sécurité
+
+### 9.1 Requête sans token
+
+```bash
+curl -s http://localhost:3001/maintenance?coloc_id=<UUID_COLOC>
+```
+
+**Réponse attendue :** `401 Accès non autorisé — Token manquant`
+
+### 9.2 Accéder à la coloc d'un autre
+
+Crée un troisième utilisateur "Charlie" (sans le faire rejoindre la coloc), récupère son token, et tente :
+
+```graphql
+query {
+  maintenanceTickets(colocId: "<UUID_COLOC>") {
+    id
+  }
+}
+```
+
+**Réponse attendue :** `Non autorisé — Vous n'appartenez pas à cette colocation`
+
+### 9.3 Bob tente d'assigner un ticket (MEMBER)
+
+```bash
+curl -s -X PATCH http://localhost:3001/maintenance/<ID_TICKET>/assign \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer TOKEN_BOB" \
+  -d '{"assigned_to": "<UUID_BOB>"}' | jq
+```
+
+**Réponse attendue :** `403 Réservé aux ADMINs`
+
+### 9.4 Validation des données
+
+```bash
+curl -s -X POST http://localhost:3001/maintenance \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer TOKEN_ALICE" \
+  -d '{"title": "", "category": "INVALIDE", "priority": "LOW", "coloc_id": "<UUID_COLOC>"}' | jq
+```
+
+**Réponse attendue :** `400` avec un tableau d'erreurs de validation.
+
+---
+
+## Récapitulatif des vérifications
+
+| Fonctionnalité | Signe que ça marche |
+|---|---|
+| Inscription / Login | `200` + token JWT |
+| Créer / rejoindre coloc | Nouveau token contenant `coloc_id` |
+| Créer une tâche | gRPC `VerifyUser` appelé (log labor), tâche en base |
+| Dashboard cache miss | Log gateway : `Cache miss` |
+| Dashboard cache hit | Log gateway : `Dashboard depuis le cache Redis` |
+| Ticket LOW créé | `201` + concordia log : `NEW_MAINTENANCE_TICKET` |
+| Ticket URGENT escalade | Tâche auto créée dans service-labor |
+| Mise à jour statut ticket | `updated_at` change, événement concordia reçu |
+| Assignation ticket ADMIN | `assigned_to` renseigné, événement concordia reçu |
+| Invalidation cache après mutation | Clé Redis `dashboard_coloc_*` supprimée |
+| Notifications MongoDB | Toutes les actions listées dans `/notifications/coloc/:id` |
+| Socket.io temps réel | Notification reçue instantanément dans la console |
+| Sécurité 401/403 | Refus sans token ou hors coloc |
