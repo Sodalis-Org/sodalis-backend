@@ -3,6 +3,7 @@ const { randomUUID } = require('crypto');
 const Complaint = require('../models/Complaint');
 const Poll = require('../models/Poll');
 const logger = require('../logger');
+const incrementKarma = require('../services/karma');
 
 function sanitize(complaint) {
     const obj = complaint.toObject ? complaint.toObject() : { ...complaint };
@@ -70,6 +71,8 @@ module.exports = (io) => {
 
             complaint.status = 'RESOLVED';
             await complaint.save();
+
+            await incrementKarma(req.user.id, complaint.coloc_id, 5, io);
 
             const payload = sanitize(complaint);
             io.emit(`coloc_${complaint.coloc_id}_notifications`, { type: 'COMPLAINT_RESOLVED', complaint: payload });
@@ -174,6 +177,8 @@ module.exports = (io) => {
 
             target.voters.push(userId);
             await poll.save();
+
+            await incrementKarma(req.user.id, poll.coloc_id, 2, io);
 
             io.emit(`coloc_${poll.coloc_id}_notifications`, { type: 'POLL_UPDATED', poll });
             logger.info({ poll_id: poll._id, option_id, user_id: userId }, 'Vote enregistré');

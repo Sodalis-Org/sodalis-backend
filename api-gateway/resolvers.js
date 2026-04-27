@@ -12,10 +12,16 @@ const resolvers = {
                 throw new Error('Non autorisé — Vous n\'appartenez pas à cette colocation');
             }
 
-            const { data } = await axios.get(`${DOMUS_URL}/colocs/${colocId}/users`, {
-                headers: { Authorization: req.headers.authorization },
-            });
-            return data;
+            const authHeader = { Authorization: req.headers.authorization };
+            const [usersRes, karmaRes] = await Promise.all([
+                axios.get(`${DOMUS_URL}/colocs/${colocId}/users`, { headers: authHeader }),
+                axios.get(`${CONCORDIA_URL}/api/karma?coloc_id=${colocId}`, { headers: authHeader }),
+            ]);
+
+            const karmaMap = {};
+            for (const profile of karmaRes.data) karmaMap[String(profile.user_id)] = profile.score;
+
+            return usersRes.data.map((u) => ({ ...u, karma_score: karmaMap[String(u.id)] ?? 0 }));
         },
 
         notifications: async (_, { colocId, page = 1, limit = 20 }, { user, req }) => {
@@ -89,20 +95,19 @@ const resolvers = {
 
             logger.info('Cache miss — appel des microservices...');
 
-            const [usersRes, tasksRes, complaintsRes] = await Promise.all([
-                axios.get(`${DOMUS_URL}/colocs/${colocId}/users`, {
-                    headers: { Authorization: req.headers.authorization },
-                }),
-                axios.get(`${LABOR_URL}/tasks/coloc/${colocId}`, {
-                    headers: { Authorization: req.headers.authorization },
-                }),
-                axios.get(`${CONCORDIA_URL}/api/complaints?coloc_id=${colocId}&status=OPEN`, {
-                    headers: { Authorization: req.headers.authorization },
-                }),
+            const authHeader = { Authorization: req.headers.authorization };
+            const [usersRes, tasksRes, complaintsRes, karmaRes] = await Promise.all([
+                axios.get(`${DOMUS_URL}/colocs/${colocId}/users`, { headers: authHeader }),
+                axios.get(`${LABOR_URL}/tasks/coloc/${colocId}`, { headers: authHeader }),
+                axios.get(`${CONCORDIA_URL}/api/complaints?coloc_id=${colocId}&status=OPEN`, { headers: authHeader }),
+                axios.get(`${CONCORDIA_URL}/api/karma?coloc_id=${colocId}`, { headers: authHeader }),
             ]);
 
+            const karmaMap = {};
+            for (const profile of karmaRes.data) karmaMap[String(profile.user_id)] = profile.score;
+
             const dashboard = {
-                users: usersRes.data,
+                users: usersRes.data.map((u) => ({ ...u, karma_score: karmaMap[String(u.id)] ?? 0 })),
                 tasks: tasksRes.data.data || tasksRes.data,
                 open_complaints: complaintsRes.data.length,
             };
@@ -245,6 +250,17 @@ const resolvers = {
                 { headers: { Authorization: req.headers.authorization } },
             );
             await cache.del(`dashboard_coloc_${data.coloc_id}`);
+            return data;
+        },
+
+        thankUser: async (_, { target_id }, { user, req }) => {
+            if (!user) throw new Error('Non autorisé');
+            const { data } = await axios.post(
+                `${CONCORDIA_URL}/api/karma/${target_id}/thank`,
+                {},
+                { headers: { Authorization: req.headers.authorization } },
+            );
+            await cache.del(`dashboard_coloc_${user.coloc_id}`);
             return data;
         },
     },

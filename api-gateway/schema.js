@@ -6,6 +6,13 @@ const typeDefs = `#graphql
     role: String!
     coloc_id: ID
     harmony_score: Int!
+    karma_score: Int
+  }
+
+  type KarmaProfile {
+    user_id: ID!
+    coloc_id: ID!
+    score: Int!
   }
 
   type AuthPayload {
@@ -138,6 +145,7 @@ const typeDefs = `#graphql
     deleteComplaint(id: ID!): Boolean
     createPoll(coloc_id: ID!, question: String!, options: [String!]!): Poll
     votePoll(poll_id: ID!, option_id: ID!): Poll
+    thankUser(target_id: ID!): KarmaProfile
   }
 `;
 

@@ -11,6 +11,7 @@ const logger = require('./logger');
 const Notification = require('./models/Notification');
 const auth = require('./middleware/auth');
 const socialRoutes = require('./routes/social');
+const karmaRoutes  = require('./routes/karma');
 
 const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:3000';
 
@@ -23,6 +24,7 @@ const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: CORS_ORIGIN } });
 
 app.use('/api', auth, socialRoutes(io));
+app.use('/api', auth, karmaRoutes(io));
 
 // ── MongoDB ──────────────────────────────────────────────────
 mongoose.connect(process.env.MONGO_URL || 'mongodb://localhost:27017/concordia_db')
