@@ -117,6 +117,12 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://localhost:3001/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     networks:
       - sodalis-net
 
@@ -140,6 +146,12 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://localhost:3002/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     networks:
       - sodalis-net
 
@@ -162,6 +174,12 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://localhost:3003/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     networks:
       - sodalis-net
 
@@ -184,8 +202,12 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+      service-domus:
+        condition: service_healthy
+      service-labor:
+        condition: service_healthy
       service-concordia:
-        condition: service_started
+        condition: service_healthy
     networks:
       - sodalis-net
 

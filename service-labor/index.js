@@ -36,20 +36,28 @@ app.use((err, _req, res, _next) => {
     });
 });
 
-const PORT = process.env.PORT || 3002;
-const server = app.listen(PORT, () => {
-    logger.info(`Service Labor démarré → http://localhost:${PORT}`);
-    startGrpcServer();
-});
+async function main() {
+    await startGrpcServer();
 
-async function shutdown(signal) {
-    logger.info({ signal }, 'Arrêt en cours...');
-    await new Promise((resolve) => server.close(resolve));
-    await pool.end();
-    await publisher.quit();
-    logger.info('Shutdown complet');
-    process.exit(0);
+    const PORT = process.env.PORT || 3002;
+    const server = app.listen(PORT, () => {
+        logger.info(`Service Labor démarré → http://localhost:${PORT}`);
+    });
+
+    async function shutdown(signal) {
+        logger.info({ signal }, 'Arrêt en cours...');
+        await new Promise((resolve) => server.close(resolve));
+        await pool.end();
+        await publisher.quit();
+        logger.info('Shutdown complet');
+        process.exit(0);
+    }
+
+    process.on('SIGTERM', () => shutdown('SIGTERM'));
+    process.on('SIGINT',  () => shutdown('SIGINT'));
 }
 
-process.on('SIGTERM', () => shutdown('SIGTERM'));
-process.on('SIGINT',  () => shutdown('SIGINT'));
+main().catch((err) => {
+    logger.error({ err }, 'Erreur fatale au démarrage');
+    process.exit(1);
+});

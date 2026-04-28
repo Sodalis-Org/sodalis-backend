@@ -22,7 +22,7 @@ CREATE TABLE maintenance_tickets (
     category    maintenance_category NOT NULL,
     priority    maintenance_priority NOT NULL DEFAULT 'LOW',
     status      maintenance_status   NOT NULL DEFAULT 'OPEN',
-    created_by  UUID NOT NULL REFERENCES users(id)  ON DELETE CASCADE,
+    created_by  UUID         REFERENCES users(id)  ON DELETE SET NULL,
     assigned_to UUID         REFERENCES users(id)  ON DELETE SET NULL,
     coloc_id    UUID NOT NULL REFERENCES colocs(id) ON DELETE CASCADE,
     created_at  TIMESTAMPTZ  NOT NULL DEFAULT now(),

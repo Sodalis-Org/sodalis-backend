@@ -148,7 +148,10 @@ const resolvers = {
             return data;
         },
 
-        createTask: async (_, { title, assignee_id, coloc_id, due_at }, { req }) => {
+        createTask: async (_, { title, assignee_id, coloc_id, due_at }, { user, req }) => {
+            if (!user || (user.role !== 'ADMIN' && user.coloc_id !== coloc_id)) {
+                throw new Error('Non autorisé — Vous n\'appartenez pas à cette colocation');
+            }
             const { data } = await axios.post(
                 `${LABOR_URL}/tasks`,
                 { title, assignee_id, coloc_id, due_at },
@@ -213,10 +216,11 @@ const resolvers = {
 
         deleteComplaint: async (_, { id }, { user, req }) => {
             if (!user) throw new Error('Non autorisé');
-            await axios.delete(
+            const { data } = await axios.delete(
                 `${CONCORDIA_URL}/api/complaints/${id}`,
                 { headers: { Authorization: req.headers.authorization } },
             );
+            if (data.coloc_id) await cache.del(`dashboard_coloc_${data.coloc_id}`);
             return true;
         },
 

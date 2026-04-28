@@ -2,6 +2,7 @@ const grpc = require('@grpc/grpc-js');
 const protoLoader = require('@grpc/proto-loader');
 const path = require('path');
 const pool = require('./db');
+const logger = require('./logger');
 
 const PROTO_PATH = path.join(__dirname, '../shared/domus.proto');
 const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
@@ -33,16 +34,19 @@ async function verifyUser(call, callback) {
 }
 
 function startGrpcServer() {
-    const server = new grpc.Server();
-    server.addService(domusProto.DomusService.service, { VerifyUser: verifyUser });
+    return new Promise((resolve, reject) => {
+        const server = new grpc.Server();
+        server.addService(domusProto.DomusService.service, { VerifyUser: verifyUser });
 
-    const GRPC_PORT = process.env.GRPC_PORT || 50051;
-    server.bindAsync(`0.0.0.0:${GRPC_PORT}`, grpc.ServerCredentials.createInsecure(), (err, port) => {
-        if (err) {
-            console.error('❌ Erreur gRPC:', err);
-            return;
-        }
-        console.log(`📡 Serveur gRPC Domus → port ${port}`);
+        const GRPC_PORT = process.env.GRPC_PORT || 50051;
+        server.bindAsync(`0.0.0.0:${GRPC_PORT}`, grpc.ServerCredentials.createInsecure(), (err, port) => {
+            if (err) {
+                logger.error({ err }, 'Erreur démarrage gRPC Domus');
+                return reject(err);
+            }
+            logger.info(`Serveur gRPC Domus → port ${port}`);
+            resolve(server);
+        });
     });
 }
 

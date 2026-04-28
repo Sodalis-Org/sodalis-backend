@@ -12,6 +12,7 @@ const Notification = require('./models/Notification');
 const auth = require('./middleware/auth');
 const socialRoutes = require('./routes/social');
 const karmaRoutes  = require('./routes/karma');
+const publisher    = require('./redis-publisher');
 
 const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:3000';
 
@@ -23,8 +24,8 @@ app.use(express.json());
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: CORS_ORIGIN } });
 
-app.use('/api', auth, socialRoutes(io));
-app.use('/api', auth, karmaRoutes(io));
+app.use('/api', auth, socialRoutes);
+app.use('/api', auth, karmaRoutes);
 
 // ── MongoDB ──────────────────────────────────────────────────
 mongoose.connect(process.env.MONGO_URL || 'mongodb://localhost:27017/concordia_db')
@@ -42,7 +43,13 @@ subscriber.connect().then(async () => {
     logger.info('Concordia écoute les événements Redis');
 
     await subscriber.subscribe('sodalis_events', async (message) => {
-        const event = JSON.parse(message);
+        let event;
+        try {
+            event = JSON.parse(message);
+        } catch (err) {
+            logger.error({ err }, 'Événement Redis malformé — message ignoré');
+            return;
+        }
         logger.info({ type: event.type, coloc_id: event.coloc_id }, 'Événement reçu');
 
         try {
@@ -73,6 +80,40 @@ subscriber.connect().then(async () => {
                 ...(event.priority    && { priority: event.priority }),
                 ...(event.status      && { status: event.status }),
                 ...(event.assigned_to && { assigned_to: event.assigned_to }),
+            });
+        }
+
+        if (['NEW_COMPLAINT', 'COMPLAINT_RESOLVED', 'COMPLAINT_DELETED'].includes(event.type)) {
+            io.emit(`coloc_${event.coloc_id}_notifications`, {
+                type: event.type,
+                message: event.message,
+                ...(event.complaint_id && { complaint_id: event.complaint_id }),
+            });
+        }
+
+        if (event.type === 'COMPLAINT_TARGETED') {
+            io.emit(`user_${event.target_id}_notifications`, {
+                type: event.type,
+                message: event.message,
+                ...(event.complaint_id && { complaint_id: event.complaint_id }),
+            });
+        }
+
+        if (['NEW_POLL', 'POLL_UPDATED'].includes(event.type)) {
+            io.emit(`coloc_${event.coloc_id}_notifications`, {
+                type: event.type,
+                message: event.message,
+                ...(event.poll_id  && { poll_id: event.poll_id }),
+                ...(event.question && { question: event.question }),
+            });
+        }
+
+        if (event.type === 'KARMA_UPDATED') {
+            io.emit(`coloc_${event.coloc_id}_notifications`, {
+                type: event.type,
+                message: event.message,
+                user_id: event.user_id,
+                new_score: event.new_score,
             });
         }
     });
@@ -132,6 +173,7 @@ async function shutdown(signal) {
     logger.info({ signal }, 'Arrêt en cours...');
     io.close();
     await new Promise((resolve) => server.close(resolve));
+    await publisher.quit();
     await subscriber.quit();
     await mongoose.connection.close();
     logger.info('Shutdown complet');

@@ -3,6 +3,7 @@ const protoLoader = require('@grpc/proto-loader');
 const path = require('path');
 const pool = require('./db');
 const publisher = require('./redis-publisher');
+const logger = require('./logger');
 
 const PROTO_PATH = path.join(__dirname, '../shared/labor.proto');
 const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
@@ -43,16 +44,19 @@ async function createTask(call, callback) {
 }
 
 function startGrpcServer() {
-    const server = new grpc.Server();
-    server.addService(laborProto.LaborService.service, { CreateTask: createTask });
+    return new Promise((resolve, reject) => {
+        const server = new grpc.Server();
+        server.addService(laborProto.LaborService.service, { CreateTask: createTask });
 
-    const GRPC_PORT = process.env.LABOR_GRPC_PORT || 50052;
-    server.bindAsync(`0.0.0.0:${GRPC_PORT}`, grpc.ServerCredentials.createInsecure(), (err, port) => {
-        if (err) {
-            console.error('❌ Erreur gRPC Labor :', err);
-            return;
-        }
-        console.log(`📡 Serveur gRPC Labor → port ${port}`);
+        const GRPC_PORT = process.env.LABOR_GRPC_PORT || 50052;
+        server.bindAsync(`0.0.0.0:${GRPC_PORT}`, grpc.ServerCredentials.createInsecure(), (err, port) => {
+            if (err) {
+                logger.error({ err }, 'Erreur démarrage gRPC Labor');
+                return reject(err);
+            }
+            logger.info(`Serveur gRPC Labor → port ${port}`);
+            resolve(server);
+        });
     });
 }
 

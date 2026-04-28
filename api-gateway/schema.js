@@ -29,7 +29,7 @@ const typeDefs = `#graphql
 
   type Notification {
     id: ID!
-    coloc_id: String!
+    coloc_id: ID!
     type: String!
     message: String!
     created_at: String!
