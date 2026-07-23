@@ -1,0 +1,11 @@
+# Allowlist : faux positifs documentaires (exemples JWT / Bearer dans guides).
+# Le CLI scanne aussi l'historique Git ; ces fichiers ont contenu des tokens
+# d'exemple qui ne sont pas de vrais secrets de production.
+title = "sodalis-backend"
+
+[allowlist]
+description = "Documentation examples (JWT placeholders, curl demos)"
+paths = [
+  '''(^|/)APIDOCUMENTATION\.md$''',
+  '''(^|/)testing_guide\.md$''',
+]
