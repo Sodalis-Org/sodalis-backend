@@ -19,7 +19,11 @@
       "Bash(echo \"LINT EXIT: $?\")",
       "Bash(echo \"TEST EXIT: $?\")",
       "Bash(echo \"AUDIT EXIT: $?\")",
-      "Read(//tmp/**)"
+      "Read(//tmp/**)",
+      "Bash(echo \"EXIT CODE: $?\")",
+      "Bash(echo \"api-gateway EXIT CODE: $?\")",
+      "Bash(python3 -m json.tool)",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(list\\(d.keys\\(\\)\\)\\)\")"
     ]
   }
 }

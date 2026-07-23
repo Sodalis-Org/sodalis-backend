@@ -1,10 +1,10 @@
 const { Router } = require('express');
 const pool = require('../db');
-const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const { body } = require('express-validator');
 const auth = require('../middleware/auth');
 const validate = require('../middleware/validate');
+const { generateInviteCode } = require('../utils/inviteCode');
 
 if (!process.env.JWT_SECRET) throw new Error('[FATAL] JWT_SECRET non défini — démarrage refusé');
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -22,17 +22,7 @@ router.post(
     async (req, res) => {
         const { name } = req.body;
 
-        const normalized = name
-            .toLowerCase()
-            .normalize('NFD')
-            .replace(/[̀-ͯ]/g, '')
-            .replace(/[^a-z0-9]/g, '-')
-            .replace(/-+/g, '-')
-            .replace(/^-|-$/g, '')
-            .substring(0, 15);
-
-        const suffix = crypto.randomBytes(2).toString('hex');
-        const generatedCode = `${normalized || 'coloc'}-${suffix}`;
+        const generatedCode = generateInviteCode(name);
 
         const client = await pool.connect();
         try {

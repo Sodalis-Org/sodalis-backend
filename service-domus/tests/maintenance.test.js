@@ -120,7 +120,9 @@ describe('maintenance routes', () => {
 
     it('PATCH /maintenance/:id/status met à jour le ticket', async () => {
         mockPool.query
-            .mockResolvedValueOnce({ rows: [{ id: 1, coloc_id: COLOC_ID, title: 'Fuite' }] })
+            .mockResolvedValueOnce({
+                rows: [{ id: 1, coloc_id: COLOC_ID, title: 'Fuite', status: 'IN_PROGRESS' }],
+            })
             .mockResolvedValueOnce({
                 rows: [{ id: 1, coloc_id: COLOC_ID, title: 'Fuite', status: 'RESOLVED' }],
             });
@@ -134,6 +136,54 @@ describe('maintenance routes', () => {
         expect(res.body.status).toBe('RESOLVED');
     });
 
+    it('PATCH /maintenance/:id/status renvoie 409 pour une transition de statut invalide', async () => {
+        mockPool.query.mockResolvedValueOnce({
+            rows: [{ id: 1, coloc_id: COLOC_ID, title: 'Fuite', status: 'RESOLVED' }],
+        });
+
+        const res = await request(app)
+            .patch('/maintenance/1/status')
+            .set('Authorization', `Bearer ${tokenFor()}`)
+            .send({ status: 'OPEN' });
+
+        expect(res.status).toBe(409);
+    });
+
+    it('PATCH /maintenance/:id/status renvoie 403 si le ticket appartient à une autre coloc', async () => {
+        mockPool.query.mockResolvedValueOnce({
+            rows: [{ id: 1, coloc_id: 'other-coloc', title: 'Fuite', status: 'OPEN' }],
+        });
+
+        const res = await request(app)
+            .patch('/maintenance/1/status')
+            .set('Authorization', `Bearer ${tokenFor()}`)
+            .send({ status: 'IN_PROGRESS' });
+
+        expect(res.status).toBe(403);
+    });
+
+    it("POST /maintenance crée quand même le ticket si l'escalade gRPC échoue", async () => {
+        mockPool.query
+            .mockResolvedValueOnce({
+                rows: [{ id: 3, title: 'Incendie', coloc_id: COLOC_ID, priority: 'URGENT' }],
+            })
+            .mockResolvedValueOnce({ rows: [{ name: 'Alice' }] });
+        mockGrpc.createTask.mockRejectedValueOnce(new Error('gRPC indisponible'));
+
+        const res = await request(app)
+            .post('/maintenance')
+            .set('Authorization', `Bearer ${tokenFor()}`)
+            .send({
+                title: 'Incendie',
+                category: 'ELECTRICITY',
+                priority: 'URGENT',
+                coloc_id: COLOC_ID,
+            });
+
+        expect(res.status).toBe(201);
+        expect(mockPublisher.publish).toHaveBeenCalled();
+    });
+
     it('PATCH /maintenance/:id/assign renvoie 403 pour un non-ADMIN', async () => {
         const res = await request(app)
             .patch('/maintenance/1/assign')
@@ -141,6 +191,32 @@ describe('maintenance routes', () => {
             .send({ assigned_to: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc' });
 
         expect(res.status).toBe(403);
+    });
+
+    it('PATCH /maintenance/:id/assign renvoie 403 si le ticket appartient à une autre coloc', async () => {
+        mockPool.query.mockResolvedValueOnce({
+            rows: [{ id: 1, coloc_id: 'other-coloc', title: 'Fuite' }],
+        });
+
+        const res = await request(app)
+            .patch('/maintenance/1/assign')
+            .set('Authorization', `Bearer ${tokenFor({ role: 'ADMIN' })}`)
+            .send({ assigned_to: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc' });
+
+        expect(res.status).toBe(403);
+    });
+
+    it("PATCH /maintenance/:id/assign renvoie 400 si l'assigné n'appartient pas à la coloc", async () => {
+        mockPool.query
+            .mockResolvedValueOnce({ rows: [{ id: 1, coloc_id: COLOC_ID, title: 'Fuite' }] })
+            .mockResolvedValueOnce({ rowCount: 0 });
+
+        const res = await request(app)
+            .patch('/maintenance/1/assign')
+            .set('Authorization', `Bearer ${tokenFor({ role: 'ADMIN' })}`)
+            .send({ assigned_to: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc' });
+
+        expect(res.status).toBe(400);
     });
 
     it('PATCH /maintenance/:id/assign assigne le ticket pour un ADMIN', async () => {

@@ -142,6 +142,74 @@ describe('tasks routes', () => {
 
         expect(res.status).toBe(200);
         expect(mockPublisher.publish).toHaveBeenCalledTimes(2);
+        const scoreEvent = JSON.parse(mockPublisher.publish.mock.calls[1][1]);
+        expect(scoreEvent).toMatchObject({
+            type: 'TASK_COMPLETED_SCORE_UPDATE',
+            user_id: ASSIGNEE_ID,
+            coloc_id: COLOC_ID,
+            is_on_time: true,
+            points: 10,
+        });
+    });
+
+    it('PATCH /tasks/:id/status marque la tâche DONE en retard et publie 2 points', async () => {
+        const pastDate = new Date(Date.now() - 86400000).toISOString();
+        mockPool.query
+            .mockResolvedValueOnce({
+                rows: [
+                    {
+                        id: TASK_ID,
+                        coloc_id: COLOC_ID,
+                        title: 'Vaisselle',
+                        assignee_id: ASSIGNEE_ID,
+                        due_at: pastDate,
+                        status: 'TODO',
+                    },
+                ],
+            })
+            .mockResolvedValueOnce({
+                rows: [{ id: TASK_ID, coloc_id: COLOC_ID, title: 'Vaisselle', status: 'DONE' }],
+            });
+
+        const res = await request(app)
+            .patch(`/tasks/${TASK_ID}/status`)
+            .set('Authorization', `Bearer ${tokenFor()}`)
+            .send({ status: 'DONE' });
+
+        expect(res.status).toBe(200);
+        const scoreEvent = JSON.parse(mockPublisher.publish.mock.calls[1][1]);
+        expect(scoreEvent).toMatchObject({
+            type: 'TASK_COMPLETED_SCORE_UPDATE',
+            is_on_time: false,
+            points: 2,
+        });
+    });
+
+    it('PATCH /tasks/:id/status ne republie pas de score si la tâche est déjà DONE', async () => {
+        mockPool.query
+            .mockResolvedValueOnce({
+                rows: [
+                    {
+                        id: TASK_ID,
+                        coloc_id: COLOC_ID,
+                        title: 'Vaisselle',
+                        assignee_id: ASSIGNEE_ID,
+                        due_at: null,
+                        status: 'DONE',
+                    },
+                ],
+            })
+            .mockResolvedValueOnce({
+                rows: [{ id: TASK_ID, coloc_id: COLOC_ID, title: 'Vaisselle', status: 'DONE' }],
+            });
+
+        const res = await request(app)
+            .patch(`/tasks/${TASK_ID}/status`)
+            .set('Authorization', `Bearer ${tokenFor()}`)
+            .send({ status: 'DONE' });
+
+        expect(res.status).toBe(200);
+        expect(mockPublisher.publish).toHaveBeenCalledTimes(1);
     });
 
     it('GET /tasks renvoie 400 sans coloc_id', async () => {

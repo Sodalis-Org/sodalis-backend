@@ -16,9 +16,16 @@ Ce document liste les seuils chiffrés retenus pour ce backend, les outils qui l
 
 Chaque service (`api-gateway`, `service-domus`, `service-labor`, `service-concordia`) a son propre `vitest.config.js` avec un seuil de couverture sur les lignes fixé à 60% (`coverage.thresholds.lines`). La commande échoue si un service passe en dessous.
 
-La stratégie de test est **unitaire avec mocks** : les dépendances d'infrastructure (PostgreSQL via `pg`, Redis, MongoDB via `mongoose`, gRPC) sont remplacées par des doublons de test — aucune base de données ni service externe n'est nécessaire pour lancer les tests. Le périmètre couvert par service (`coverage.include` dans chaque `vitest.config.js`) se limite volontairement à la logique applicative testable en isolation : assemblage Express (`app.js`), routes, middlewares, et services métier purs. Le bootstrap d'infrastructure (`index.js`, `db.js`, `grpc-*.js`, `redis-*.js`) est exclu — il ne contient pas de logique métier et nécessiterait des tests d'intégration contre de vrais services pour avoir de la valeur.
+La stratégie de test est **unitaire avec mocks** : les dépendances d'infrastructure (PostgreSQL via `pg`, Redis, MongoDB via `mongoose`, gRPC) sont remplacées par des doublons de test — aucune base de données ni service externe n'est nécessaire pour lancer les tests. Le périmètre couvert par service (`coverage.include` dans chaque `vitest.config.js`) se limite volontairement à la logique applicative testable en isolation : assemblage Express (`app.js`), routes, middlewares, services métier purs (`utils/`, `services/`). Le bootstrap d'infrastructure (`index.js`, `db.js`, `grpc-*.js`, `redis-*.js`) est exclu — il ne contient pas de logique métier et nécessiterait des tests d'intégration contre de vrais services pour avoir de la valeur.
 
-État actuel (lignes) : api-gateway 93.9%, service-domus 92.3%, service-labor 87.3%, service-concordia 88.9%.
+Trois logiques auparavant enfouies dans des handlers Express ont été extraites en modules purs, directement testables sans mock (0 dépendance à `pg`/`redis`/gRPC) :
+- `service-domus/utils/inviteCode.js` — génération du code d'invitation (slug NFD + suffixe hex).
+- `service-labor/utils/scoring.js` — calcul des points de harmony score (+10 à temps / +2 en retard).
+- `service-domus/utils/ticketState.js` — graphe de transitions de statut des tickets de maintenance (`OPEN → IN_PROGRESS → RESOLVED`, `CANCELLED` atteignable depuis `OPEN`/`IN_PROGRESS`, états terminaux non réversibles).
+
+Le handler du subscriber Redis de `service-concordia` (persistance MongoDB + diffusion Socket.io par événement) a également été extrait de `index.js` vers `services/eventRouter.js` pour le rendre unitairement testable.
+
+État actuel (lignes) : api-gateway 93.9%, service-domus 94.4%, service-labor 87.6%, service-concordia 89.9%.
 
 ### Erreurs de lint (0)
 

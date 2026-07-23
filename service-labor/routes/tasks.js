@@ -5,6 +5,7 @@ const { verifyUser } = require('../grpc-client');
 const publisher = require('../redis-publisher');
 const auth = require('../middleware/auth');
 const validate = require('../middleware/validate');
+const { computeHarmonyPoints } = require('../utils/scoring');
 
 const router = Router();
 
@@ -111,8 +112,7 @@ router.patch(
             );
 
             if (status === 'DONE' && task.status !== 'DONE') {
-                const is_on_time = task.due_at ? new Date() <= new Date(task.due_at) : false;
-                const points = is_on_time ? 10 : 2;
+                const { is_on_time, points } = computeHarmonyPoints(task.due_at);
                 await publisher.publish(
                     'sodalis_events',
                     JSON.stringify({

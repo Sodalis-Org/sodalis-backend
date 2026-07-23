@@ -6,6 +6,7 @@ const { createTask } = require('../grpc-labor-client');
 const auth = require('../middleware/auth');
 const validate = require('../middleware/validate');
 const logger = require('../logger');
+const { canTransition } = require('../utils/ticketState');
 
 const router = Router();
 
@@ -134,7 +135,7 @@ router.patch(
 
         try {
             const { rows } = await pool.query(
-                'SELECT id, coloc_id, title FROM maintenance_tickets WHERE id = $1',
+                'SELECT id, coloc_id, title, status FROM maintenance_tickets WHERE id = $1',
                 [id],
             );
 
@@ -148,6 +149,12 @@ router.patch(
                 return res
                     .status(403)
                     .json({ error: "Non autorisé — Vous n'appartenez pas à cette colocation" });
+            }
+
+            if (!canTransition(ticket.status, status)) {
+                return res.status(409).json({
+                    error: `Transition de statut invalide : ${ticket.status} → ${status}`,
+                });
             }
 
             const { rows: updated } = await pool.query(

@@ -57,4 +57,16 @@ describe('api-gateway app', () => {
         expect(res.status).toBe(200);
         expect(res.body.data.__typename).toBe('Query');
     });
+
+    it('POST /graphql avec un token invalide rejette le résolveur sans appeler les services', async () => {
+        const res = await request(app)
+            .post('/graphql')
+            .set('Authorization', 'Bearer not-a-valid-token')
+            .send({ query: '{ myColoc { id } }' });
+
+        expect(res.status).toBe(200);
+        expect(res.body.errors).toBeDefined();
+        expect(res.body.errors[0].message).toMatch(/Non autorisé/);
+        expect(mockAxios.get).not.toHaveBeenCalled();
+    });
 });
