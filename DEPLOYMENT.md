@@ -60,9 +60,11 @@ Déclenché par tout `push` (toutes branches) et par toute `pull_request` vers `
    d'accès à l'infrastructure (`pg`, `redis-publisher`, `redis-subscriber`, clients gRPC) via un
    helper `mockRequire` maison. Le rapport de couverture est publié en artefact
    (`coverage-backend`).
-5. **Audit de sécurité** (job `security`, **bloquant** pour l'audit, informatif pour le scan de
-   secrets) — `npm run audit` (`npm audit --audit-level=high`, 0 vulnérabilité haute/critique
-   tolérée) puis `gitleaks/gitleaks-action@v2` pour détecter tout secret commité par erreur.
+5. **Audit de sécurité** (job `security`, **bloquant**) — `npm run audit` (`npm audit
+   --audit-level=high`, 0 vulnérabilité haute/critique tolérée) puis le binaire CLI `gitleaks
+   detect` (MIT) pour détecter tout secret commité par erreur. On n'utilise pas
+   `gitleaks/gitleaks-action@v2` : cette Action exige une licence `GITLEAKS_LICENSE` dès que le
+   dépôt appartient à une organisation GitHub (ici `Sodalis-Org`), alors que le CLI reste libre.
 6. **Build des images** (job `build`, **bloquant**, dépend de `quality` et `test`) —
    `docker compose build` construit les 4 Dockerfiles multi-stage. Ce job ne pousse rien : il
    valide seulement que les images se construisent, avec des valeurs `JWT_SECRET`/
@@ -120,7 +122,7 @@ Reprise du tableau de [QUALITY.md](QUALITY.md), avec le job CI qui vérifie chaq
 | Couverture de tests | ≥ 60% lignes par service | Job `test` (`npm run test:coverage`) |
 | Erreurs de lint | 0 | Job `quality` (`npm run lint`) |
 | Vulnérabilités des dépendances | 0 high/critical | Job `security` (`npm run audit`) |
-| Secrets commités | 0 | Job `security` (`gitleaks-action`) |
+| Secrets commités | 0 | Job `security` (`gitleaks detect` CLI) |
 | Construction des images | doit réussir | Job `build` (`docker compose build`) |
 | P95 `getColocDashboard` (GraphQL) | < 200 ms | `npm run perf:check` (workflow manuel `perf.yml`, hors CI systématique — trop coûteux sur chaque push) |
 | Démarrage de la stack complète | < 60 s | `npm run startup:check` (healthchecks Docker Compose) |

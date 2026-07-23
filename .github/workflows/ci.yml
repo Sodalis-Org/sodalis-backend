@@ -84,10 +84,15 @@ jobs:
             - name: Audit des dépendances (0 high/critical)
               run: npm run audit
 
+            # CLI MIT (gratuit) : gitleaks-action@v2 exige une licence pour les orgs GitHub
+            - name: Install gitleaks
+              run: |
+                  curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.21.2/gitleaks_8.21.2_linux_x64.tar.gz \
+                    | tar -xz -C /tmp
+                  sudo mv /tmp/gitleaks /usr/local/bin/
+
             - name: Scan de secrets
-              uses: gitleaks/gitleaks-action@v2
-              env:
-                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: gitleaks detect --source . --verbose --redact
 
     build:
         name: Build Docker images
