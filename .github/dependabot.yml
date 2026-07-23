@@ -1,0 +1,32 @@
+version: 2
+
+updates:
+    - package-ecosystem: 'npm'
+      directory: '/'
+      schedule:
+          interval: 'weekly'
+
+    - package-ecosystem: 'npm'
+      directory: '/api-gateway'
+      schedule:
+          interval: 'weekly'
+
+    - package-ecosystem: 'npm'
+      directory: '/service-domus'
+      schedule:
+          interval: 'weekly'
+
+    - package-ecosystem: 'npm'
+      directory: '/service-labor'
+      schedule:
+          interval: 'weekly'
+
+    - package-ecosystem: 'npm'
+      directory: '/service-concordia'
+      schedule:
+          interval: 'weekly'
+
+    - package-ecosystem: 'github-actions'
+      directory: '/'
+      schedule:
+          interval: 'weekly'
