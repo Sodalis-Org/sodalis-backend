@@ -3,6 +3,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const pinoHttp = require('pino-http');
 const mongoose = require('mongoose');
 const logger = require('./logger');
@@ -34,6 +35,19 @@ function corsOriginValidator(origin, cb) {
     return cb(new Error(`CORS refusé pour l'origine: ${origin}`));
 }
 
+const apiLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 100,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Trop de requêtes — réessayez dans une minute' },
+    skip: (req) => req.path === '/health',
+    handler: (req, res, _next, options) => {
+        logger.warn({ ip: req.ip }, 'Rate limit dépassé sur service-concordia');
+        res.status(options.statusCode).json(options.message);
+    },
+});
+
 function createApp() {
     const app = express();
     app.use(helmet());
@@ -46,6 +60,7 @@ function createApp() {
     );
     app.use(pinoHttp({ logger }));
     app.use(express.json());
+    app.use(apiLimiter);
 
     app.use('/api', auth, socialRoutes);
     app.use('/api', auth, karmaRoutes);

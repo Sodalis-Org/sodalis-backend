@@ -3,6 +3,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const { ApolloServer } = require('@apollo/server');
 const { expressMiddleware } = require('@as-integrations/express5');
 const jwt = require('jsonwebtoken');
@@ -38,6 +39,18 @@ function corsOriginValidator(origin, cb) {
 }
 
 const isProduction = process.env.NODE_ENV === 'production';
+
+const graphqlLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 100,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Trop de requêtes — réessayez dans une minute' },
+    handler: (req, res, _next, options) => {
+        logger.warn({ ip: req.ip }, 'Rate limit dépassé sur /graphql');
+        res.status(options.statusCode).json(options.message);
+    },
+});
 
 async function createApp() {
     const app = express();
@@ -77,6 +90,7 @@ async function createApp() {
             credentials: true,
             optionsSuccessStatus: 204,
         }),
+        graphqlLimiter,
         express.json(),
         expressMiddleware(apolloServer, {
             context: async ({ req }) => {
