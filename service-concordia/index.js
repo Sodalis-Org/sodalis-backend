@@ -9,6 +9,7 @@ const Notification = require('./models/Notification');
 const publisher = require('./redis-publisher');
 const { createApp, corsOriginValidator } = require('./app');
 const { routeEvent } = require('./services/eventRouter');
+const { authenticateSocket } = require('./socketAuth');
 
 const app = createApp();
 const server = http.createServer(app);
@@ -18,6 +19,8 @@ const io = new Server(server, {
         credentials: true,
     },
 });
+
+io.use(authenticateSocket);
 
 // ── MongoDB ──────────────────────────────────────────────────
 mongoose
@@ -49,8 +52,14 @@ subscriber.connect().then(async () => {
 });
 
 // ── WebSockets ───────────────────────────────────────────────
+// La room jointe dépend uniquement de l'identité vérifiée par authenticateSocket
+// (socket.user), jamais d'une valeur envoyée par le client au moment de la connexion.
 io.on('connection', (socket) => {
-    logger.info({ socketId: socket.id }, 'Client connecté');
+    logger.info({ socketId: socket.id, userId: socket.user.id }, 'Client connecté');
+
+    if (socket.user.coloc_id) socket.join(`coloc_${socket.user.coloc_id}`);
+    socket.join(`user_${socket.user.id}`);
+
     socket.on('disconnect', () => logger.info({ socketId: socket.id }, 'Client déconnecté'));
 });
 

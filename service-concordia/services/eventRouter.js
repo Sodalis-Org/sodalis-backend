@@ -22,7 +22,7 @@ async function routeEvent(event, { Notification, io, logger }) {
     }
 
     if (event.type === 'NEW_TASK' || event.type === 'TASK_UPDATED') {
-        io.emit(`coloc_${event.coloc_id}_notifications`, {
+        io.to(`coloc_${event.coloc_id}`).emit('notification', {
             type: event.type,
             message: event.message,
             ...(event.task_id && { task_id: event.task_id }),
@@ -31,7 +31,7 @@ async function routeEvent(event, { Notification, io, logger }) {
     }
 
     if (MAINTENANCE_EVENTS.includes(event.type)) {
-        io.emit(`coloc_${event.coloc_id}_notifications`, {
+        io.to(`coloc_${event.coloc_id}`).emit('notification', {
             type: event.type,
             message: event.message,
             ...(event.ticket_id && { ticket_id: event.ticket_id }),
@@ -42,7 +42,7 @@ async function routeEvent(event, { Notification, io, logger }) {
     }
 
     if (COMPLAINT_EVENTS.includes(event.type)) {
-        io.emit(`coloc_${event.coloc_id}_notifications`, {
+        io.to(`coloc_${event.coloc_id}`).emit('notification', {
             type: event.type,
             message: event.message,
             ...(event.complaint_id && { complaint_id: event.complaint_id }),
@@ -50,7 +50,7 @@ async function routeEvent(event, { Notification, io, logger }) {
     }
 
     if (event.type === 'COMPLAINT_TARGETED') {
-        io.emit(`user_${event.target_id}_notifications`, {
+        io.to(`user_${event.target_id}`).emit('notification', {
             type: event.type,
             message: event.message,
             ...(event.complaint_id && { complaint_id: event.complaint_id }),
@@ -58,7 +58,7 @@ async function routeEvent(event, { Notification, io, logger }) {
     }
 
     if (POLL_EVENTS.includes(event.type)) {
-        io.emit(`coloc_${event.coloc_id}_notifications`, {
+        io.to(`coloc_${event.coloc_id}`).emit('notification', {
             type: event.type,
             message: event.message,
             ...(event.poll_id && { poll_id: event.poll_id }),
@@ -67,7 +67,7 @@ async function routeEvent(event, { Notification, io, logger }) {
     }
 
     if (event.type === 'KARMA_UPDATED') {
-        io.emit(`coloc_${event.coloc_id}_notifications`, {
+        io.to(`coloc_${event.coloc_id}`).emit('notification', {
             type: event.type,
             message: event.message,
             user_id: event.user_id,

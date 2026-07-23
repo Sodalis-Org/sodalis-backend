@@ -3,11 +3,13 @@ const { routeEvent } = require('../services/eventRouter');
 describe('routeEvent', () => {
     let Notification;
     let io;
+    let emit;
     const COLOC_ID = 'coloc-1';
 
     beforeEach(() => {
         Notification = { create: vi.fn().mockResolvedValue({}) };
-        io = { emit: vi.fn() };
+        emit = vi.fn();
+        io = { to: vi.fn(() => ({ emit })) };
     });
 
     it('NEW_TASK persiste la notification et emit sur la room de la coloc', async () => {
@@ -20,7 +22,8 @@ describe('routeEvent', () => {
             type: 'NEW_TASK',
             message: 'Nouvelle tâche',
         });
-        expect(io.emit).toHaveBeenCalledWith(`coloc_${COLOC_ID}_notifications`, {
+        expect(io.to).toHaveBeenCalledWith(`coloc_${COLOC_ID}`);
+        expect(emit).toHaveBeenCalledWith('notification', {
             type: 'NEW_TASK',
             message: 'Nouvelle tâche',
         });
@@ -37,7 +40,8 @@ describe('routeEvent', () => {
 
         await routeEvent(event, { Notification, io });
 
-        expect(io.emit).toHaveBeenCalledWith(`coloc_${COLOC_ID}_notifications`, {
+        expect(io.to).toHaveBeenCalledWith(`coloc_${COLOC_ID}`);
+        expect(emit).toHaveBeenCalledWith('notification', {
             type: 'TASK_UPDATED',
             message: 'Tâche mise à jour',
             task_id: 'task-1',
@@ -60,7 +64,8 @@ describe('routeEvent', () => {
 
             await routeEvent(event, { Notification, io });
 
-            expect(io.emit).toHaveBeenCalledWith(`coloc_${COLOC_ID}_notifications`, {
+            expect(io.to).toHaveBeenCalledWith(`coloc_${COLOC_ID}`);
+            expect(emit).toHaveBeenCalledWith('notification', {
                 type,
                 message: 'Ticket',
                 ticket_id: 'ticket-1',
@@ -78,7 +83,8 @@ describe('routeEvent', () => {
 
             await routeEvent(event, { Notification, io });
 
-            expect(io.emit).toHaveBeenCalledWith(`coloc_${COLOC_ID}_notifications`, {
+            expect(io.to).toHaveBeenCalledWith(`coloc_${COLOC_ID}`);
+            expect(emit).toHaveBeenCalledWith('notification', {
                 type,
                 message: 'Plainte',
                 complaint_id: 'c-1',
@@ -86,7 +92,7 @@ describe('routeEvent', () => {
         },
     );
 
-    it('COMPLAINT_TARGETED emit sur la room de l\'utilisateur ciblé, pas de la coloc', async () => {
+    it("COMPLAINT_TARGETED emit sur la room de l'utilisateur ciblé, pas de la coloc", async () => {
         const event = {
             type: 'COMPLAINT_TARGETED',
             coloc_id: COLOC_ID,
@@ -97,15 +103,13 @@ describe('routeEvent', () => {
 
         await routeEvent(event, { Notification, io });
 
-        expect(io.emit).toHaveBeenCalledWith('user_user-3_notifications', {
+        expect(io.to).toHaveBeenCalledWith('user_user-3');
+        expect(io.to).not.toHaveBeenCalledWith(expect.stringContaining('coloc_'));
+        expect(emit).toHaveBeenCalledWith('notification', {
             type: 'COMPLAINT_TARGETED',
             message: 'Vous êtes visé par une plainte',
             complaint_id: 'c-1',
         });
-        expect(io.emit).not.toHaveBeenCalledWith(
-            expect.stringContaining('coloc_'),
-            expect.anything(),
-        );
     });
 
     it.each(['NEW_POLL', 'POLL_UPDATED'])(
@@ -121,7 +125,8 @@ describe('routeEvent', () => {
 
             await routeEvent(event, { Notification, io });
 
-            expect(io.emit).toHaveBeenCalledWith(`coloc_${COLOC_ID}_notifications`, {
+            expect(io.to).toHaveBeenCalledWith(`coloc_${COLOC_ID}`);
+            expect(emit).toHaveBeenCalledWith('notification', {
                 type,
                 message: 'Sondage',
                 poll_id: 'poll-1',
@@ -141,7 +146,8 @@ describe('routeEvent', () => {
 
         await routeEvent(event, { Notification, io });
 
-        expect(io.emit).toHaveBeenCalledWith(`coloc_${COLOC_ID}_notifications`, {
+        expect(io.to).toHaveBeenCalledWith(`coloc_${COLOC_ID}`);
+        expect(emit).toHaveBeenCalledWith('notification', {
             type: 'KARMA_UPDATED',
             message: 'Karma mis à jour',
             user_id: 'user-1',
@@ -155,7 +161,7 @@ describe('routeEvent', () => {
         await routeEvent(event, { Notification, io });
 
         expect(Notification.create).toHaveBeenCalled();
-        expect(io.emit).not.toHaveBeenCalled();
+        expect(io.to).not.toHaveBeenCalled();
     });
 
     it("n'échoue pas si la persistance MongoDB échoue et emit quand même", async () => {
@@ -163,6 +169,6 @@ describe('routeEvent', () => {
         const event = { type: 'NEW_TASK', coloc_id: COLOC_ID, message: 'Nouvelle tâche' };
 
         await expect(routeEvent(event, { Notification, io })).resolves.not.toThrow();
-        expect(io.emit).toHaveBeenCalled();
+        expect(emit).toHaveBeenCalled();
     });
 });
