@@ -20,7 +20,9 @@ docker-compose up -d
 docker-compose down -v
 ```
 
-There is no test runner configured. Refer to `testing_guide.md` for a manual end-to-end test scenario.
+Vitest is configured in every workspace (`npm run test` / `npm run test:coverage`, 60% line
+coverage threshold per service — see `QUALITY.md`) and runs in CI on every push/PR. Refer to
+`testing_guide.md` for a manual end-to-end scenario complementing the unit tests.
 
 ## Environment
 
