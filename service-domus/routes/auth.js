@@ -6,6 +6,7 @@ const rateLimit = require('express-rate-limit');
 const { body } = require('express-validator');
 const pool = require('../db');
 const validate = require('../middleware/validate');
+const logger = require('../logger');
 
 if (!process.env.JWT_SECRET) throw new Error('[FATAL] JWT_SECRET non défini — démarrage refusé');
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -18,6 +19,10 @@ const authLimiter = rateLimit({
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'Trop de tentatives — réessayez dans 15 minutes' },
+    handler: (req, res, _next, options) => {
+        logger.warn({ ip: req.ip }, 'Rate limit dépassé sur /auth');
+        res.status(options.statusCode).json(options.message);
+    },
 });
 
 // POST /auth/register — Inscription

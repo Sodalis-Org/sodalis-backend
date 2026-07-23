@@ -1,6 +1,7 @@
 const { Router } = require('express');
 const KarmaProfile = require('../models/KarmaProfile');
 const incrementKarma = require('../services/karma');
+const logger = require('../logger');
 
 const router = Router();
 
@@ -29,6 +30,10 @@ router.get('/karma', async (req, res) => {
     }
 
     if (req.user.role !== 'ADMIN' && req.user.coloc_id !== coloc_id) {
+        logger.warn(
+            { userId: req.user.id },
+            'Accès refusé — karma d\'une autre colocation',
+        );
         return res
             .status(403)
             .json({ error: "Non autorisé — Vous n'appartenez pas à cette colocation" });

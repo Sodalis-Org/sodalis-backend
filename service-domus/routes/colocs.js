@@ -6,6 +6,7 @@ const { body } = require('express-validator');
 const auth = require('../middleware/auth');
 const validate = require('../middleware/validate');
 const { generateInviteCode } = require('../utils/inviteCode');
+const logger = require('../logger');
 
 if (!process.env.JWT_SECRET) throw new Error('[FATAL] JWT_SECRET non défini — démarrage refusé');
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -120,6 +121,10 @@ router.get('/:id', auth, async (req, res) => {
         return res.status(404).json({ error: 'Colocation introuvable' });
     }
     if (!req.user.coloc_id || String(req.user.coloc_id) !== colocId) {
+        logger.warn(
+            { userId: req.user.id },
+            'Accès refusé — détail de coloc hors de sa colocation',
+        );
         return res
             .status(403)
             .json({ error: "Non autorisé — Vous n'appartenez pas à cette colocation" });

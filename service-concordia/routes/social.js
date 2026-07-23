@@ -21,6 +21,7 @@ function toPollObject(poll) {
 
 function checkColoc(user, coloc_id) {
     if (!user || (user.role !== 'ADMIN' && String(user.coloc_id) !== String(coloc_id))) {
+        logger.warn({ userId: user?.id }, 'Accès refusé — appartenance à une autre colocation');
         const err = new Error("Non autorisé — Vous n'appartenez pas à cette colocation");
         err.status = 403;
         throw err;

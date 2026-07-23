@@ -39,6 +39,10 @@ const resolvers = {
 
         usersByColoc: async (_, { colocId }, { user, req }) => {
             if (!user || (user.role !== 'ADMIN' && user.coloc_id !== colocId)) {
+                logger.warn(
+                    { userId: user?.id },
+                    "Accès refusé — appartenance à une autre colocation",
+                );
                 throw new Error("Non autorisé — Vous n'appartenez pas à cette colocation");
             }
 
@@ -58,6 +62,10 @@ const resolvers = {
 
         notifications: async (_, { colocId, page = 1, limit = 20 }, { user, req }) => {
             if (!user || (user.role !== 'ADMIN' && user.coloc_id !== colocId)) {
+                logger.warn(
+                    { userId: user?.id },
+                    "Accès refusé — appartenance à une autre colocation",
+                );
                 throw new Error("Non autorisé — Vous n'appartenez pas à cette colocation");
             }
 
@@ -70,6 +78,10 @@ const resolvers = {
 
         maintenanceTickets: async (_, { colocId }, { user, req }) => {
             if (!user || (user.role !== 'ADMIN' && user.coloc_id !== colocId)) {
+                logger.warn(
+                    { userId: user?.id },
+                    "Accès refusé — appartenance à une autre colocation",
+                );
                 throw new Error("Non autorisé — Vous n'appartenez pas à cette colocation");
             }
 
@@ -81,6 +93,10 @@ const resolvers = {
 
         tasksByColoc: async (_, { colocId }, { user, req }) => {
             if (!user || (user.role !== 'ADMIN' && user.coloc_id !== colocId)) {
+                logger.warn(
+                    { userId: user?.id },
+                    "Accès refusé — appartenance à une autre colocation",
+                );
                 throw new Error("Non autorisé — Vous n'appartenez pas à cette colocation");
             }
 
@@ -92,6 +108,10 @@ const resolvers = {
 
         complaints: async (_, { colocId }, { user, req }) => {
             if (!user || (user.role !== 'ADMIN' && user.coloc_id !== colocId)) {
+                logger.warn(
+                    { userId: user?.id },
+                    "Accès refusé — appartenance à une autre colocation",
+                );
                 throw new Error("Non autorisé — Vous n'appartenez pas à cette colocation");
             }
             const { data } = await axios.get(
@@ -103,6 +123,10 @@ const resolvers = {
 
         polls: async (_, { colocId }, { user, req }) => {
             if (!user || (user.role !== 'ADMIN' && user.coloc_id !== colocId)) {
+                logger.warn(
+                    { userId: user?.id },
+                    "Accès refusé — appartenance à une autre colocation",
+                );
                 throw new Error("Non autorisé — Vous n'appartenez pas à cette colocation");
             }
             const { data } = await axios.get(`${CONCORDIA_URL}/api/polls?coloc_id=${colocId}`, {
@@ -113,6 +137,10 @@ const resolvers = {
 
         getColocDashboard: async (_, { colocId }, { user, req }) => {
             if (!user || (user.role !== 'ADMIN' && user.coloc_id !== colocId)) {
+                logger.warn(
+                    { userId: user?.id },
+                    "Accès refusé — appartenance à une autre colocation",
+                );
                 throw new Error("Non autorisé — Vous n'appartenez pas à cette colocation");
             }
 
@@ -214,6 +242,10 @@ const resolvers = {
 
         createTask: async (_, { title, assignee_id, coloc_id, due_at }, { user, req }) => {
             if (!user || (user.role !== 'ADMIN' && user.coloc_id !== coloc_id)) {
+                logger.warn(
+                    { userId: user?.id },
+                    "Accès refusé — appartenance à une autre colocation",
+                );
                 throw new Error("Non autorisé — Vous n'appartenez pas à cette colocation");
             }
             const { data } = await axios.post(

@@ -5,6 +5,7 @@ const { verifyUser } = require('../grpc-client');
 const publisher = require('../redis-publisher');
 const auth = require('../middleware/auth');
 const validate = require('../middleware/validate');
+const logger = require('../logger');
 const { computeHarmonyPoints } = require('../utils/scoring');
 
 const router = Router();
@@ -30,6 +31,10 @@ router.post(
         const { title, assignee_id, coloc_id, due_at } = req.body;
 
         if (req.user.coloc_id !== coloc_id) {
+            logger.warn(
+                { userId: req.user.id },
+                'Accès refusé — création de tâche hors de sa colocation',
+            );
             return res
                 .status(403)
                 .json({ error: "Non autorisé — Vous n'appartenez pas à cette colocation" });
@@ -90,6 +95,10 @@ router.patch(
             const task = rows[0];
 
             if (req.user.coloc_id !== task.coloc_id) {
+                logger.warn(
+                    { userId: req.user.id },
+                    'Accès refusé — mise à jour de tâche hors de sa colocation',
+                );
                 return res
                     .status(403)
                     .json({ error: "Non autorisé — Vous n'appartenez pas à cette colocation" });
@@ -144,6 +153,10 @@ router.get('/', auth, async (req, res, next) => {
     }
 
     if (req.user.coloc_id !== coloc_id) {
+        logger.warn(
+            { userId: req.user.id },
+            'Accès refusé — liste des tâches hors de sa colocation',
+        );
         return res
             .status(403)
             .json({ error: "Non autorisé — Vous n'appartenez pas à cette colocation" });
@@ -164,6 +177,10 @@ router.get('/', auth, async (req, res, next) => {
 // GET /tasks/coloc/:id — Lister les tâches avec pagination (utilisé par la Gateway)
 router.get('/coloc/:id', auth, async (req, res, next) => {
     if (req.user.coloc_id !== req.params.id) {
+        logger.warn(
+            { userId: req.user.id },
+            'Accès refusé — liste des tâches paginée hors de sa colocation',
+        );
         return res
             .status(403)
             .json({ error: "Non autorisé — Vous n'appartenez pas à cette colocation" });
