@@ -148,4 +148,23 @@ describe('colocs routes', () => {
         expect(res.status).toBe(200);
         expect(res.body).toHaveLength(1);
     });
+
+    it("GET /colocs/:id/users renvoie 403 pour un membre d'une autre colocation", async () => {
+        const res = await request(app)
+            .get(`/colocs/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/users`)
+            .set('Authorization', `Bearer ${tokenFor()}`);
+
+        expect(res.status).toBe(403);
+        expect(mockPool.query).not.toHaveBeenCalled();
+    });
+
+    it('GET /colocs/:id/users autorise un ADMIN pour une autre colocation', async () => {
+        mockPool.query.mockResolvedValueOnce({ rows: [] });
+
+        const res = await request(app)
+            .get(`/colocs/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/users`)
+            .set('Authorization', `Bearer ${tokenFor({ role: 'ADMIN' })}`);
+
+        expect(res.status).toBe(200);
+    });
 });

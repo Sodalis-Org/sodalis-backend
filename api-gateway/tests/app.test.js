@@ -69,4 +69,19 @@ describe('api-gateway app', () => {
         expect(res.body.errors[0].message).toMatch(/Non autorisé/);
         expect(mockAxios.get).not.toHaveBeenCalled();
     });
+
+    // Dernier test du fichier : le rate limiter /graphql est un singleton au niveau du
+    // module (compteur jamais réinitialisé entre tests). 105 requêtes dépassent la
+    // limite de 100, quel que soit le solde déjà consommé par les tests précédents.
+    it('POST /graphql renvoie 429 après dépassement du rate limit', async () => {
+        let lastStatus;
+        for (let i = 0; i < 105; i++) {
+            const res = await request(app)
+                .post('/graphql')
+                .send({ query: '{ __typename }' });
+            lastStatus = res.status;
+        }
+
+        expect(lastStatus).toBe(429);
+    });
 });

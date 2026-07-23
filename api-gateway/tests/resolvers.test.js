@@ -271,14 +271,25 @@ describe('resolvers.Mutation', () => {
         expect(mockCache.del).toHaveBeenCalledWith(`dashboard_coloc_${COLOC_ID}`);
     });
 
-    it('assignTicket invalide le cache dashboard', async () => {
+    it('assignTicket invalide le cache dashboard pour un ADMIN', async () => {
         mockAxios.patch.mockResolvedValueOnce({ data: { id: 'm1', coloc_id: COLOC_ID } });
         await resolvers.Mutation.assignTicket(
             null,
             { id: 'm1', assigned_to: 'u2' },
-            { user: { id: 'u1' }, req },
+            { user: { id: 'u1', role: 'ADMIN' }, req },
         );
         expect(mockCache.del).toHaveBeenCalledWith(`dashboard_coloc_${COLOC_ID}`);
+    });
+
+    it('assignTicket refuse un rôle MEMBER', async () => {
+        await expect(
+            resolvers.Mutation.assignTicket(
+                null,
+                { id: 'm1', assigned_to: 'u2' },
+                { user: { id: 'u1', role: 'MEMBER' }, req },
+            ),
+        ).rejects.toThrow('Réservé aux ADMINs');
+        expect(mockAxios.patch).not.toHaveBeenCalled();
     });
 
     it('createComplaint invalide le cache dashboard', async () => {

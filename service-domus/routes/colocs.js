@@ -143,6 +143,16 @@ router.get('/:id', auth, async (req, res) => {
 
 // GET /colocs/:id/users — Membres d'une coloc
 router.get('/:id/users', auth, async (req, res) => {
+    if (req.user.role !== 'ADMIN' && String(req.user.coloc_id) !== String(req.params.id)) {
+        logger.warn(
+            { userId: req.user.id },
+            'Accès refusé — liste des membres hors de sa colocation',
+        );
+        return res
+            .status(403)
+            .json({ error: "Non autorisé — Vous n'appartenez pas à cette colocation" });
+    }
+
     const { rows } = await pool.query(
         'SELECT id, name, email, role, harmony_score, created_at FROM users WHERE coloc_id = $1',
         [req.params.id],

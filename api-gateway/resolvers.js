@@ -294,6 +294,13 @@ const resolvers = {
 
         assignTicket: async (_, { id, assigned_to }, { user, req }) => {
             if (!user) throw new Error('Non autorisé');
+            if (user.role !== 'ADMIN') {
+                logger.warn(
+                    { userId: user.id },
+                    'Accès refusé — assignation de ticket réservée aux ADMINs',
+                );
+                throw new Error('Non autorisé — Réservé aux ADMINs');
+            }
             const { data } = await axios.patch(
                 `${DOMUS_URL}/maintenance/${id}/assign`,
                 { assigned_to },
