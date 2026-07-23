@@ -4,6 +4,9 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+const depthLimit = require('graphql-depth-limit');
+const { getComplexity, simpleEstimator } = require('graphql-query-complexity');
+const { GraphQLError } = require('graphql');
 const { ApolloServer } = require('@apollo/server');
 const { expressMiddleware } = require('@as-integrations/express5');
 const jwt = require('jsonwebtoken');
@@ -40,6 +43,37 @@ function corsOriginValidator(origin, cb) {
 
 const isProduction = process.env.NODE_ENV === 'production';
 
+// Le schéma actuel est plat (aucun type récursif, getColocDashboard ne dépasse pas 4 niveaux) :
+// ces limites sont préventives, pas correctives d'un risque déjà exploitable aujourd'hui.
+const MAX_QUERY_DEPTH = 10;
+const MAX_QUERY_COMPLEXITY = 1000;
+
+// graphql-query-complexity a besoin des variables réelles de la requête pour estimer
+// les champs dont le coût dépend d'un argument (ex. limit: $n) : on ne peut pas passer
+// une règle de validation statique, donc le contrôle se fait via un plugin Apollo qui a
+// accès à `request.variables` (après résolution de l'opération, avant exécution).
+const complexityPlugin = {
+    async requestDidStart() {
+        return {
+            async didResolveOperation({ request, document, schema, operationName }) {
+                const complexity = getComplexity({
+                    schema,
+                    query: document,
+                    variables: request.variables || {},
+                    operationName: operationName || request.operationName,
+                    estimators: [simpleEstimator({ defaultComplexity: 1 })],
+                });
+
+                if (complexity > MAX_QUERY_COMPLEXITY) {
+                    throw new GraphQLError(
+                        `Requête trop complexe (${complexity}) — maximum autorisé : ${MAX_QUERY_COMPLEXITY}`,
+                    );
+                }
+            },
+        };
+    },
+};
+
 const graphqlLimiter = rateLimit({
     windowMs: 60 * 1000,
     max: 100,
@@ -59,6 +93,8 @@ async function createApp() {
         typeDefs,
         resolvers,
         introspection: !isProduction,
+        validationRules: [depthLimit(MAX_QUERY_DEPTH)],
+        plugins: [complexityPlugin],
     });
     await apolloServer.start();
 
