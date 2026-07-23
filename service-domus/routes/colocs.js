@@ -48,6 +48,7 @@ router.post(
                 {
                     id: req.user.id,
                     email: req.user.email,
+                    name: req.user.name,
                     coloc_id: coloc.id,
                     role: 'ADMIN',
                     jti: randomUUID(),
@@ -99,6 +100,7 @@ router.post(
             {
                 id: req.user.id,
                 email: req.user.email,
+                name: req.user.name,
                 coloc_id: coloc.id,
                 role: req.user.role,
                 jti: randomUUID(),

@@ -12,6 +12,11 @@ const CACHE_TTL = 30;
 
 const resolvers = {
     Query: {
+        // Rehydrate le contexte d'authentification côté client : le jeton vit dans un
+        // cookie httpOnly (illisible en JS), seule une requête au serveur permet de
+        // savoir qui est connecté après un rechargement de page.
+        me: (_, __, { user }) => user || null,
+
         myColoc: async (_, __, { user, req }) => {
             if (!user || !user.coloc_id) {
                 throw new Error('Non autorisé — Aucune colocation associée');

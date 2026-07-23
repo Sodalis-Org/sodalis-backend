@@ -17,6 +17,15 @@ function mockRes() {
 describe('resolvers.Query', () => {
     beforeEach(() => vi.clearAllMocks());
 
+    it('me renvoie null sans utilisateur authentifié', () => {
+        expect(resolvers.Query.me(null, {}, { user: null })).toBeNull();
+    });
+
+    it('me renvoie les claims du jeton décodé', () => {
+        const user = { id: 'u1', name: 'Alice', email: 'a@test.com', role: 'ADMIN' };
+        expect(resolvers.Query.me(null, {}, { user })).toBe(user);
+    });
+
     it('myColoc lève une erreur sans coloc_id', async () => {
         await expect(
             resolvers.Query.myColoc(null, {}, { user: { coloc_id: null }, req }),

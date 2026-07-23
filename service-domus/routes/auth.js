@@ -66,14 +66,27 @@ router.post(
         }
 
         const token = jwt.sign(
-            { id: user.id, email: user.email, coloc_id: user.coloc_id, role: user.role, jti: randomUUID() },
+            {
+                id: user.id,
+                email: user.email,
+                coloc_id: user.coloc_id,
+                role: user.role,
+                name: user.name,
+                jti: randomUUID(),
+            },
             JWT_SECRET,
             { expiresIn: '24h', algorithm: 'HS256' },
         );
 
         res.json({
             token,
-            user: { id: user.id, name: user.name, email: user.email, role: user.role },
+            user: {
+                id: user.id,
+                name: user.name,
+                email: user.email,
+                role: user.role,
+                coloc_id: user.coloc_id,
+            },
         });
     },
 );
