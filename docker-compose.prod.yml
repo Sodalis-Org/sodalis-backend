@@ -7,9 +7,9 @@
 #     d'être reconstruits localement ;
 #   - restart: always et NODE_ENV=production.
 #
-# Utilisation :
-#   GHCR_OWNER=<owner> SODALIS_VERSION=v1.0.0 docker compose -f docker-compose.prod.yml pull
-#   GHCR_OWNER=<owner> SODALIS_VERSION=v1.0.0 docker compose -f docker-compose.prod.yml up -d
+# Utilisation (owner org en minuscules ; version avec ou sans préfixe v) :
+#   GHCR_OWNER=sodalis-org SODALIS_VERSION=v1.0.0 docker compose -f docker-compose.prod.yml pull
+#   GHCR_OWNER=sodalis-org SODALIS_VERSION=v1.0.0 docker compose -f docker-compose.prod.yml up -d
 
 services:
     domus-db:

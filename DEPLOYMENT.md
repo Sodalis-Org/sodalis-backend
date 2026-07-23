@@ -84,9 +84,11 @@ Déclenché par le push d'un tag `v*.*.*` ([`release.yml`](.github/workflows/rel
    d'incrémentation documentée dans [CHANGELOG.md](CHANGELOG.md)).
 3. **Construction et publication** — le job `build-and-push` (matrice sur les 4 services)
    construit chaque image via `docker/build-push-action@v6` et la pousse sur
-   `ghcr.io/<owner>/sodalis-<service>` avec deux tags : le numéro de version (`vX.Y.Z`) et le SHA
-   court du commit. Le tag `latest` n'est jamais utilisé — l'immuabilité des versions livrées est
-   le point démontré.
+   `ghcr.io/<owner>/sodalis-<service>` avec trois tags : la version SemVer sans `v` (`X.Y.Z`),
+   le tag Git brut (`vX.Y.Z`), et le SHA court du commit. Le tag `latest` n'est jamais utilisé —
+   l'immuabilité des versions livrées est le point démontré. Un job suivant expose les packages
+   GHCR en **public** (sinon le premier publish org les laisse privés et le `docker pull` exige
+   un PAT).
 4. **Création de la GitHub Release** — le job `github-release` extrait la section correspondante
    de `CHANGELOG.md` et crée la Release GitHub associée au tag.
 5. **Récupération sur l'hôte cible** :
