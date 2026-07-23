@@ -1,0 +1,228 @@
+# Sodalis Backend — Docker Compose (production)
+#
+# Différences avec docker-compose.yml (développement) :
+#   - aucun port de base de données publié sur l'hôte (domus-db, labor-db, redis, concordia-db) ;
+#   - seuls api-gateway (4000) et service-concordia (3003) restent publiés ;
+#   - les 4 services applicatifs utilisent une image GHCR versionnée (${SODALIS_VERSION}) au lieu
+#     d'être reconstruits localement ;
+#   - restart: always et NODE_ENV=production.
+#
+# Utilisation :
+#   GHCR_OWNER=<owner> SODALIS_VERSION=v1.0.0 docker compose -f docker-compose.prod.yml pull
+#   GHCR_OWNER=<owner> SODALIS_VERSION=v1.0.0 docker compose -f docker-compose.prod.yml up -d
+
+services:
+    domus-db:
+        image: postgres:17-alpine
+        container_name: sodalis_domus_db
+        restart: always
+        env_file:
+            - .env
+        environment:
+            POSTGRES_USER: ${POSTGRES_USER:-admin}
+            POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Définis POSTGRES_PASSWORD dans .env}
+            POSTGRES_DB: ${POSTGRES_DB:-domus_db}
+        volumes:
+            - domus_data:/var/lib/postgresql/data
+            - ./service-domus/db-init:/docker-entrypoint-initdb.d
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-admin} -d $${POSTGRES_DB:-domus_db}"]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+            start_period: 30s
+        deploy:
+            resources:
+                limits:
+                    memory: 512M
+        networks:
+            - sodalis-net
+
+    labor-db:
+        image: postgres:17-alpine
+        container_name: sodalis_labor_db
+        restart: always
+        env_file:
+            - .env
+        environment:
+            POSTGRES_USER: ${POSTGRES_USER:-admin}
+            POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Définis POSTGRES_PASSWORD dans .env}
+            POSTGRES_DB: labor_db
+        volumes:
+            - labor_data:/var/lib/postgresql/data
+            - ./service-labor/db-init:/docker-entrypoint-initdb.d
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-admin} -d labor_db"]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+            start_period: 30s
+        deploy:
+            resources:
+                limits:
+                    memory: 512M
+        networks:
+            - sodalis-net
+
+    redis:
+        image: redis:7-alpine
+        container_name: sodalis_redis
+        restart: always
+        healthcheck:
+            test: ["CMD", "redis-cli", "ping"]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+        deploy:
+            resources:
+                limits:
+                    memory: 128M
+        networks:
+            - sodalis-net
+
+    concordia-db:
+        image: mongo:7
+        container_name: sodalis_mongo
+        restart: always
+        volumes:
+            - concordia_data:/data/db
+        healthcheck:
+            test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+            start_period: 30s
+        deploy:
+            resources:
+                limits:
+                    memory: 512M
+        networks:
+            - sodalis-net
+
+    service-domus:
+        image: ghcr.io/${GHCR_OWNER:?Définis GHCR_OWNER dans .env}/sodalis-service-domus:${SODALIS_VERSION:?Définis SODALIS_VERSION dans .env}
+        container_name: sodalis_domus
+        restart: always
+        environment:
+            NODE_ENV: production
+            PORT: 3001
+            JWT_SECRET: ${JWT_SECRET:?Définis JWT_SECRET dans .env}
+            GRPC_PORT: 50051
+            DATABASE_URL: postgres://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD}@domus-db:5432/${POSTGRES_DB:-domus_db}
+            CORS_ORIGINS: ${CORS_ORIGINS:-}
+            CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
+            REDIS_URL: redis://redis:6379
+            LABOR_GRPC_URL: service-labor:50052
+        depends_on:
+            domus-db:
+                condition: service_healthy
+            redis:
+                condition: service_healthy
+        healthcheck:
+            test: ["CMD-SHELL", "wget -q -O - http://localhost:3001/health || exit 1"]
+            interval: 15s
+            timeout: 5s
+            retries: 5
+            start_period: 30s
+        networks:
+            - sodalis-net
+
+    service-labor:
+        image: ghcr.io/${GHCR_OWNER:?Définis GHCR_OWNER dans .env}/sodalis-service-labor:${SODALIS_VERSION:?Définis SODALIS_VERSION dans .env}
+        container_name: sodalis_labor
+        restart: always
+        environment:
+            NODE_ENV: production
+            PORT: 3002
+            JWT_SECRET: ${JWT_SECRET:?Définis JWT_SECRET dans .env}
+            DATABASE_URL: postgres://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD}@labor-db:5432/labor_db
+            REDIS_URL: redis://redis:6379
+            DOMUS_GRPC_URL: service-domus:50051
+            LABOR_GRPC_PORT: 50052
+        depends_on:
+            labor-db:
+                condition: service_healthy
+            redis:
+                condition: service_healthy
+        healthcheck:
+            test: ["CMD-SHELL", "wget -q -O - http://localhost:3002/health || exit 1"]
+            interval: 15s
+            timeout: 5s
+            retries: 5
+            start_period: 30s
+        networks:
+            - sodalis-net
+
+    service-concordia:
+        image: ghcr.io/${GHCR_OWNER:?Définis GHCR_OWNER dans .env}/sodalis-service-concordia:${SODALIS_VERSION:?Définis SODALIS_VERSION dans .env}
+        container_name: sodalis_concordia
+        restart: always
+        environment:
+            NODE_ENV: production
+            PORT: 3003
+            JWT_SECRET: ${JWT_SECRET:?Définis JWT_SECRET dans .env}
+            MONGO_URL: mongodb://concordia-db:27017/concordia_db
+            REDIS_URL: redis://redis:6379
+            CORS_ORIGINS: ${CORS_ORIGINS:-}
+            CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
+        ports:
+            - "3003:3003"
+        depends_on:
+            concordia-db:
+                condition: service_healthy
+            redis:
+                condition: service_healthy
+        healthcheck:
+            test: ["CMD-SHELL", "wget -q -O - http://localhost:3003/health || exit 1"]
+            interval: 15s
+            timeout: 5s
+            retries: 5
+            start_period: 30s
+        networks:
+            - sodalis-net
+
+    api-gateway:
+        image: ghcr.io/${GHCR_OWNER:?Définis GHCR_OWNER dans .env}/sodalis-api-gateway:${SODALIS_VERSION:?Définis SODALIS_VERSION dans .env}
+        container_name: sodalis_gateway
+        restart: always
+        environment:
+            NODE_ENV: production
+            PORT: 4000
+            JWT_SECRET: ${JWT_SECRET:?Définis JWT_SECRET dans .env}
+            REDIS_URL: redis://redis:6379
+            DOMUS_URL: http://service-domus:3001
+            LABOR_URL: http://service-labor:3002
+            CONCORDIA_URL: http://service-concordia:3003
+            CORS_ORIGINS: ${CORS_ORIGINS:-}
+            CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
+        ports:
+            - "4000:4000"
+        depends_on:
+            redis:
+                condition: service_healthy
+            service-domus:
+                condition: service_healthy
+            service-labor:
+                condition: service_healthy
+            service-concordia:
+                condition: service_healthy
+        healthcheck:
+            test: ["CMD-SHELL", "wget -q -O - http://localhost:4000/health || exit 1"]
+            interval: 15s
+            timeout: 5s
+            retries: 5
+            start_period: 30s
+        networks:
+            - sodalis-net
+
+volumes:
+    domus_data:
+        driver: local
+    labor_data:
+        driver: local
+    concordia_data:
+        driver: local
+
+networks:
+    sodalis-net:
+        driver: bridge
