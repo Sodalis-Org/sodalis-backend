@@ -63,7 +63,7 @@ The source of truth for users and colocations. Runs two servers simultaneously:
 
 The `VerifyUser` RPC checks that a `user_id` belongs to a given `coloc_id` in PostgreSQL. DB schema is in `db-init/01-init.sql` (tables: `colocs`, `users`; enum: `user_role`).
 
-JWT payload shape: `{ id, email, coloc_id, role }`.
+JWT payload shape: `{ id, email, name, coloc_id, role, jti }`, signed with `algorithm: 'HS256'` pinned explicitly. `jti` (a `crypto.randomUUID()`) is what the revocation denylist keys off — see "Auth pattern" below.
 
 ### service-labor
 
@@ -77,18 +77,21 @@ The gRPC client is in `grpc-client.js`; the Redis publisher is in `redis-publish
 
 ### service-concordia
 
-No own database for routes — it is purely event-driven. Subscribes to the `sodalis_events` Redis channel:
+No own database for routes — it is purely event-driven. Subscribes to the `sodalis_events` Redis channel via `services/eventRouter.js`:
 - Persists each event as a `Notification` document in MongoDB (`models/Notification.js`).
-- Emits a Socket.io event `coloc_<coloc_id>_notifications` to all connected clients.
+- Emits a single `notification` Socket.io event to the relevant room (`io.to('coloc_<coloc_id>')` or `io.to('user_<target_id>')` for `COMPLAINT_TARGETED`) — never a global `io.emit`.
+
+The Socket.io handshake is authenticated by `socketAuth.js`: it reads the `sodalis_token` cookie from `socket.handshake.headers.cookie`, verifies it (HS256, checked against the revocation denylist), and rejects the connection if missing/invalid/revoked. `index.js` then joins the socket to rooms derived from the *verified* identity (`socket.user`), never from anything the client sends — this is what makes the room-based isolation actually enforced server-side rather than a client-side listening convention.
 
 Exposes one REST endpoint: `GET /notifications/coloc/:id` (returns last 20 notifications).
 
 ### api-gateway
 
 Thin GraphQL proxy. No own database. Resolvers in `resolvers.js`:
-- Forward requests to domus/labor via `axios`, passing the original `Authorization` header.
+- Forward requests to domus/labor/concordia via `axios`, using `forwardHeaders(req)` — re-attaches `Authorization: Bearer <token>` (extracted from the cookie, see below) and propagates `x-request-id` so a request stays traceable across all four services' logs.
 - Cache `getColocDashboard` in Redis for 30 seconds (key: `dashboard_coloc_<colocId>`).
-- Authorization is checked by verifying the JWT and comparing `user.coloc_id` to the requested `colocId` (ADMINs bypass).
+- Authorization is checked by verifying the JWT and comparing `user.coloc_id` to the requested `colocId` (ADMINs bypass). `assignTicket` additionally checks `user.role === 'ADMIN'` at the gateway itself (defense-in-depth on top of the same check in service-domus).
+- `Query.me` returns the already-verified JWT claims from context — this is how the frontend rehydrates "who's logged in" after a page reload, since it can no longer read the token itself (see below).
 
 ### Shared
 
@@ -96,4 +99,8 @@ Thin GraphQL proxy. No own database. Resolvers in `resolvers.js`:
 
 ### Auth pattern
 
-Every service re-validates the JWT independently using the same `JWT_SECRET`. The middleware is copy-pasted in each service (`middleware/auth.js`) — there is no shared auth library. The gateway decodes the token in its Apollo context and enforces ownership in each resolver.
+The JWT lives in an `httpOnly`/`SameSite=Strict` cookie (`sodalis_token`, see `api-gateway/authCookie.js`), set by the gateway's `login`/`createColoc`/`joinColoc` resolvers — never returned as a raw string in a GraphQL response. The browser never touches the token directly; it just gets forwarded automatically because the frontend's Apollo client sends `credentials: 'include'`.
+
+Every service still re-validates the JWT independently using the same `JWT_SECRET` (algorithm pinned to `HS256`). The middleware is copy-pasted in each service (`middleware/auth.js`) — there is no shared auth library. Each middleware, plus the gateway's Apollo context and `service-concordia/socketAuth.js`, also checks a Redis revocation denylist (key `revoked_jwt:<jti>`) before trusting an otherwise-valid token. The `logout` GraphQL mutation is what writes to that denylist (TTL = the token's remaining lifetime) and clears the cookie.
+
+Internally, the gateway still forwards `Authorization: Bearer <token>` to domus/labor/concordia (extracted from the cookie in the Apollo context) — only the browser-facing transport changed, not the service-to-service one. See `SECURITY.md` for the full OWASP-mapped rationale.
