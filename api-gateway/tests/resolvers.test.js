@@ -7,8 +7,12 @@ mockRequire(require, '../cache', mockCache);
 
 const resolvers = require('../resolvers');
 
-const req = { headers: { authorization: 'Bearer token123' } };
+const req = { headers: { authorization: 'Bearer token123' }, cookies: {} };
 const COLOC_ID = 'coloc-1';
+
+function mockRes() {
+    return { cookie: vi.fn(), clearCookie: vi.fn() };
+}
 
 describe('resolvers.Query', () => {
     beforeEach(() => vi.clearAllMocks());
@@ -109,13 +113,18 @@ describe('resolvers.Mutation', () => {
         expect(result.id).toBe('u1');
     });
 
-    it('login délègue à Domus', async () => {
-        mockAxios.post.mockResolvedValueOnce({ data: { token: 'tok' } });
-        const result = await resolvers.Mutation.login(null, {
-            email: 'a@test.com',
-            password: 'pw',
+    it('login délègue à Domus et pose le cookie httpOnly', async () => {
+        mockAxios.post.mockResolvedValueOnce({
+            data: { token: 'tok', user: { id: 'u1', email: 'a@test.com' } },
         });
-        expect(result.token).toBe('tok');
+        const res = mockRes();
+        const result = await resolvers.Mutation.login(
+            null,
+            { email: 'a@test.com', password: 'pw' },
+            { res },
+        );
+        expect(result.user.id).toBe('u1');
+        expect(res.cookie).toHaveBeenCalledWith('sodalis_token', 'tok', expect.any(Object));
     });
 
     it('createTask refuse un utilisateur non autorisé', async () => {
@@ -170,10 +179,18 @@ describe('resolvers.Mutation', () => {
         expect(mockCache.del).toHaveBeenCalledWith(`dashboard_coloc_${COLOC_ID}`);
     });
 
-    it('createColoc délègue à Domus', async () => {
-        mockAxios.post.mockResolvedValueOnce({ data: { id: COLOC_ID, name: 'Chez nous' } });
-        const result = await resolvers.Mutation.createColoc(null, { name: 'Chez nous' }, { req });
-        expect(result.id).toBe(COLOC_ID);
+    it('createColoc délègue à Domus et repose le cookie httpOnly', async () => {
+        mockAxios.post.mockResolvedValueOnce({
+            data: { coloc: { id: COLOC_ID, name: 'Chez nous' }, token: 'new-tok' },
+        });
+        const res = mockRes();
+        const result = await resolvers.Mutation.createColoc(
+            null,
+            { name: 'Chez nous' },
+            { req, res },
+        );
+        expect(result.coloc.id).toBe(COLOC_ID);
+        expect(res.cookie).toHaveBeenCalledWith('sodalis_token', 'new-tok', expect.any(Object));
     });
 
     it('joinColoc refuse un utilisateur non authentifié', async () => {
@@ -182,14 +199,47 @@ describe('resolvers.Mutation', () => {
         ).rejects.toThrow('Non autorisé');
     });
 
-    it('joinColoc délègue à Domus', async () => {
-        mockAxios.post.mockResolvedValueOnce({ data: { id: COLOC_ID } });
+    it('joinColoc délègue à Domus et repose le cookie httpOnly', async () => {
+        mockAxios.post.mockResolvedValueOnce({
+            data: { coloc: { id: COLOC_ID }, token: 'new-tok' },
+        });
+        const res = mockRes();
         const result = await resolvers.Mutation.joinColoc(
             null,
             { invite_code: 'abcd' },
-            { user: { id: 'u1' }, req },
+            { user: { id: 'u1' }, req, res },
         );
-        expect(result.id).toBe(COLOC_ID);
+        expect(result.coloc.id).toBe(COLOC_ID);
+        expect(res.cookie).toHaveBeenCalledWith('sodalis_token', 'new-tok', expect.any(Object));
+    });
+
+    it('logout révoque le jeton courant et efface le cookie', async () => {
+        const jwt = require('jsonwebtoken');
+        process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-secret';
+        const token = jwt.sign({ id: 'u1', jti: 'jti-1' }, process.env.JWT_SECRET, {
+            expiresIn: '1h',
+        });
+        const res = mockRes();
+        const result = await resolvers.Mutation.logout(
+            null,
+            null,
+            { req: { cookies: { sodalis_token: token } }, res },
+        );
+        expect(result).toBe(true);
+        expect(mockCache.setEx).toHaveBeenCalledWith(
+            'revoked_jwt:jti-1',
+            expect.any(Number),
+            '1',
+        );
+        expect(res.clearCookie).toHaveBeenCalledWith('sodalis_token', expect.any(Object));
+    });
+
+    it('logout efface simplement le cookie sans jeton', async () => {
+        const res = mockRes();
+        const result = await resolvers.Mutation.logout(null, null, { req: { cookies: {} }, res });
+        expect(result).toBe(true);
+        expect(mockCache.setEx).not.toHaveBeenCalled();
+        expect(res.clearCookie).toHaveBeenCalled();
     });
 
     it('updateTaskStatus délègue à Labor', async () => {

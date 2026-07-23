@@ -16,7 +16,6 @@ const typeDefs = `#graphql
   }
 
   type AuthPayload {
-    token: String!
     user: User!
   }
 
@@ -52,9 +51,8 @@ const typeDefs = `#graphql
     invite_code: String!
   }
 
-  type ColocWithToken {
+  type ColocResult {
     coloc: Coloc!
-    token: String!
   }
 
   type Task {
@@ -128,8 +126,9 @@ const typeDefs = `#graphql
   type Mutation {
     register(name: String!, email: String!, password: String!): RegisterPayload
     login(email: String!, password: String!): AuthPayload
-    createColoc(name: String!): ColocWithToken
-    joinColoc(invite_code: String!): ColocWithToken
+    logout: Boolean
+    createColoc(name: String!): ColocResult
+    joinColoc(invite_code: String!): ColocResult
     createTask(title: String!, assignee_id: ID!, coloc_id: ID!, due_at: String): Task
     updateTaskStatus(id: ID!, status: String!): Task
     createMaintenanceTicket(

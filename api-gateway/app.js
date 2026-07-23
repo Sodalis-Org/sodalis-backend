@@ -3,6 +3,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
+const cookieParser = require('cookie-parser');
 const rateLimit = require('express-rate-limit');
 const depthLimit = require('graphql-depth-limit');
 const { getComplexity, simpleEstimator } = require('graphql-query-complexity');
@@ -12,8 +13,10 @@ const { expressMiddleware } = require('@as-integrations/express5');
 const jwt = require('jsonwebtoken');
 const pinoHttp = require('pino-http');
 const logger = require('./logger');
+const cache = require('./cache');
 const typeDefs = require('./schema');
 const resolvers = require('./resolvers');
+const { AUTH_COOKIE_NAME } = require('./authCookie');
 
 if (!process.env.JWT_SECRET) throw new Error('[FATAL] JWT_SECRET non défini — démarrage refusé');
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -118,6 +121,7 @@ async function createApp() {
     );
 
     app.use(pinoHttp({ logger }));
+    app.use(cookieParser());
 
     app.use(
         '/graphql',
@@ -129,20 +133,30 @@ async function createApp() {
         graphqlLimiter,
         express.json(),
         expressMiddleware(apolloServer, {
-            context: async ({ req }) => {
-                const authHeader = req.headers.authorization;
+            context: async ({ req, res }) => {
+                const token = req.cookies?.[AUTH_COOKIE_NAME];
                 let user = null;
 
-                if (authHeader && authHeader.startsWith('Bearer ')) {
-                    const token = authHeader.split(' ')[1];
+                if (token) {
                     try {
-                        user = jwt.verify(token, JWT_SECRET);
+                        const decoded = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] });
+                        const revoked =
+                            decoded.jti && (await cache.get(`revoked_jwt:${decoded.jti}`));
+
+                        if (revoked) {
+                            logger.warn({ userId: decoded.id }, 'Token révoqué ignoré');
+                        } else {
+                            user = decoded;
+                            // Les services en aval (domus/labor/concordia) attendent toujours
+                            // un en-tête Authorization — le cookie ne les concerne pas.
+                            req.headers.authorization = `Bearer ${token}`;
+                        }
                     } catch {
                         logger.warn('Token invalide ignoré');
                     }
                 }
 
-                return { user, req };
+                return { user, req, res };
             },
         }),
     );

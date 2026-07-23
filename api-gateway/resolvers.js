@@ -1,6 +1,11 @@
 const axios = require('axios');
+const jwt = require('jsonwebtoken');
 const logger = require('./logger');
 const cache = require('./cache');
+const { AUTH_COOKIE_NAME, AUTH_COOKIE_OPTIONS } = require('./authCookie');
+
+if (!process.env.JWT_SECRET) throw new Error('[FATAL] JWT_SECRET non défini — démarrage refusé');
+const JWT_SECRET = process.env.JWT_SECRET;
 
 const { DOMUS_URL, LABOR_URL, CONCORDIA_URL } = process.env;
 const CACHE_TTL = 30;
@@ -147,28 +152,50 @@ const resolvers = {
             return data;
         },
 
-        login: async (_, { email, password }) => {
+        login: async (_, { email, password }, { res }) => {
             const { data } = await axios.post(`${DOMUS_URL}/auth/login`, { email, password });
-            return data;
+            res.cookie(AUTH_COOKIE_NAME, data.token, AUTH_COOKIE_OPTIONS);
+            return { user: data.user };
         },
 
-        createColoc: async (_, { name }, { req }) => {
+        logout: async (_, __, { req, res }) => {
+            const token = req.cookies?.[AUTH_COOKIE_NAME];
+
+            if (token) {
+                try {
+                    const decoded = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] });
+                    const ttl = decoded.exp - Math.floor(Date.now() / 1000);
+                    if (decoded.jti && ttl > 0) {
+                        await cache.setEx(`revoked_jwt:${decoded.jti}`, ttl, '1');
+                    }
+                } catch {
+                    // Jeton déjà invalide/expiré — rien à révoquer.
+                }
+            }
+
+            res.clearCookie(AUTH_COOKIE_NAME, AUTH_COOKIE_OPTIONS);
+            return true;
+        },
+
+        createColoc: async (_, { name }, { req, res }) => {
             const { data } = await axios.post(
                 `${DOMUS_URL}/colocs`,
                 { name },
                 { headers: { Authorization: req.headers.authorization } },
             );
-            return data;
+            res.cookie(AUTH_COOKIE_NAME, data.token, AUTH_COOKIE_OPTIONS);
+            return { coloc: data.coloc };
         },
 
-        joinColoc: async (_, { invite_code }, { user, req }) => {
+        joinColoc: async (_, { invite_code }, { user, req, res }) => {
             if (!user) throw new Error('Non autorisé');
             const { data } = await axios.post(
                 `${DOMUS_URL}/colocs/join`,
                 { invite_code },
                 { headers: { Authorization: req.headers.authorization } },
             );
-            return data;
+            res.cookie(AUTH_COOKIE_NAME, data.token, AUTH_COOKIE_OPTIONS);
+            return { coloc: data.coloc };
         },
 
         createTask: async (_, { title, assignee_id, coloc_id, due_at }, { user, req }) => {

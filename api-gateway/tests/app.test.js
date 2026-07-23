@@ -38,7 +38,7 @@ describe('api-gateway app', () => {
 
         const res = await request(app)
             .post('/graphql')
-            .set('Authorization', `Bearer ${token}`)
+            .set('Cookie', `sodalis_token=${token}`)
             .send({
                 query: 'query($id: ID!) { getColocDashboard(colocId: $id) { open_complaints } }',
                 variables: { id: 'coloc-1' },
@@ -51,7 +51,7 @@ describe('api-gateway app', () => {
     it('POST /graphql ignore un token invalide sans planter', async () => {
         const res = await request(app)
             .post('/graphql')
-            .set('Authorization', 'Bearer not-a-valid-token')
+            .set('Cookie', 'sodalis_token=not-a-valid-token')
             .send({ query: '{ __typename }' });
 
         expect(res.status).toBe(200);
@@ -61,7 +61,7 @@ describe('api-gateway app', () => {
     it('POST /graphql avec un token invalide rejette le résolveur sans appeler les services', async () => {
         const res = await request(app)
             .post('/graphql')
-            .set('Authorization', 'Bearer not-a-valid-token')
+            .set('Cookie', 'sodalis_token=not-a-valid-token')
             .send({ query: '{ myColoc { id } }' });
 
         expect(res.status).toBe(200);
