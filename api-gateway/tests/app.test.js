@@ -23,6 +23,12 @@ describe('api-gateway app', () => {
         expect(res.body.status).toBe('ok');
     });
 
+    it('applique les en-têtes de sécurité helmet par défaut', async () => {
+        const res = await request(app).get('/health');
+        expect(res.headers['x-content-type-options']).toBe('nosniff');
+        expect(res.headers['x-dns-prefetch-control']).toBe('off');
+    });
+
     it('POST /graphql exécute une requête authentifiée', async () => {
         mockCache.get.mockResolvedValueOnce(null);
         mockAxios.get

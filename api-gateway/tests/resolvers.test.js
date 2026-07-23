@@ -6,6 +6,7 @@ mockRequire(require, 'axios', mockAxios);
 mockRequire(require, '../cache', mockCache);
 
 const resolvers = require('../resolvers');
+const logger = require('../logger');
 
 const req = { headers: { authorization: 'Bearer token123' }, cookies: {} };
 const COLOC_ID = 'coloc-1';
@@ -42,14 +43,20 @@ describe('resolvers.Query', () => {
         expect(result.id).toBe(COLOC_ID);
     });
 
-    it("usersByColoc refuse un membre d'une autre coloc", async () => {
+    it("usersByColoc refuse un membre d'une autre coloc et logge l'accès refusé", async () => {
+        const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
         await expect(
             resolvers.Query.usersByColoc(
                 null,
                 { colocId: COLOC_ID },
-                { user: { role: 'MEMBER', coloc_id: 'other' }, req },
+                { user: { id: 'u1', role: 'MEMBER', coloc_id: 'other' }, req },
             ),
         ).rejects.toThrow('Non autorisé');
+        expect(warnSpy).toHaveBeenCalledWith(
+            { userId: 'u1' },
+            expect.stringContaining('Accès refusé'),
+        );
+        warnSpy.mockRestore();
     });
 
     it('usersByColoc fusionne les scores karma', async () => {
