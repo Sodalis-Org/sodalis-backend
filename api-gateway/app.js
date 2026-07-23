@@ -1,5 +1,6 @@
 require('dotenv').config();
 
+const { randomUUID } = require('crypto');
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -120,7 +121,15 @@ async function createApp() {
               helmet({ contentSecurityPolicy: false }),
     );
 
-    app.use(pinoHttp({ logger }));
+    // Identifiant de corrélation propagé du client jusqu'aux services en aval (via
+    // forwardHeaders dans resolvers.js), pour retracer une requête de bout en bout.
+    app.use((req, res, next) => {
+        req.headers['x-request-id'] = req.headers['x-request-id'] || randomUUID();
+        res.setHeader('x-request-id', req.headers['x-request-id']);
+        next();
+    });
+
+    app.use(pinoHttp({ logger, genReqId: (req) => req.headers['x-request-id'] }));
     app.use(cookieParser());
 
     app.use(

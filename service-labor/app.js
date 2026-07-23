@@ -11,7 +11,7 @@ function createApp() {
     const app = express();
 
     app.use(helmet());
-    app.use(pinoHttp({ logger }));
+    app.use(pinoHttp({ logger, genReqId: (req) => req.headers['x-request-id'] }));
     app.use(express.json());
 
     app.use('/tasks', tasksRouter);

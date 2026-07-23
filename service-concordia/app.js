@@ -58,7 +58,7 @@ function createApp() {
             optionsSuccessStatus: 204,
         }),
     );
-    app.use(pinoHttp({ logger }));
+    app.use(pinoHttp({ logger, genReqId: (req) => req.headers['x-request-id'] }));
     app.use(express.json());
     app.use(apiLimiter);
 
