@@ -86,9 +86,10 @@ Déclenché par le push d'un tag `v*.*.*` ([`release.yml`](.github/workflows/rel
    construit chaque image via `docker/build-push-action@v6` et la pousse sur
    `ghcr.io/<owner>/sodalis-<service>` avec trois tags : la version SemVer sans `v` (`X.Y.Z`),
    le tag Git brut (`vX.Y.Z`), et le SHA court du commit. Le tag `latest` n'est jamais utilisé —
-   l'immuabilité des versions livrées est le point démontré. Un job suivant expose les packages
-   GHCR en **public** si l'API l'autorise (sinon le job est non bloquant : rendre chaque
-   package public une fois via l'UI GitHub → Package settings → Change visibility).
+   l'immuabilité des versions livrées est le point démontré. La première publication GHCR sous
+   une organisation laisse les packages **privés** : leur passage en public se fait **une fois**
+   dans l'UI (réglages org Packages, puis Package settings → Change visibility). Le token
+   Actions `GITHUB_TOKEN` ne peut pas effectuer ce changement via l'API pour une org.
 4. **Création de la GitHub Release** — le job `github-release` extrait la section correspondante
    de `CHANGELOG.md` et crée la Release GitHub associée au tag.
 5. **Récupération sur l'hôte cible** :
