@@ -1,6 +1,7 @@
 {
     "name": "sodalis-backend",
     "private": true,
+    "version": "1.0.0",
     "workspaces": [
         "api-gateway",
         "service-domus",
