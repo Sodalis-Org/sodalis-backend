@@ -2,3 +2,8 @@
 **/.env
 **/*.log
 .git
+.github
+coverage
+**/*.test.js
+**/tests
+*.md
