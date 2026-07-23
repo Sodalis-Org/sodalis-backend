@@ -16,10 +16,15 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et ce pr
 
 ## [Non publié]
 
+## [1.0.1] - 2026-07-23
+
 ### Changed
 
 - Mise à jour de `CLAUDE.md` : les affirmations sur l'absence de runner de tests ne sont plus
   d'actualité (Vitest est configuré et exécuté en CI).
+- Suppression du job Release qui tentait de rendre les packages GHCR publics via l'API
+  (`GITHUB_TOKEN` org → 404) ; la visibilité publique reste une étape manuelle unique documentée
+  dans `DEPLOYMENT.md`.
 
 ## [1.0.0] - 2026-07-23
 
