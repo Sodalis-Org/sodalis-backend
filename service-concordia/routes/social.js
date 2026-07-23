@@ -21,7 +21,7 @@ function toPollObject(poll) {
 
 function checkColoc(user, coloc_id) {
     if (!user || (user.role !== 'ADMIN' && String(user.coloc_id) !== String(coloc_id))) {
-        const err = new Error('Non autorisé — Vous n\'appartenez pas à cette colocation');
+        const err = new Error("Non autorisé — Vous n'appartenez pas à cette colocation");
         err.status = 403;
         throw err;
     }
@@ -48,21 +48,27 @@ router.post('/complaints', async (req, res, next) => {
             is_anonymous,
         });
 
-        await publisher.publish('sodalis_events', JSON.stringify({
-            type: 'NEW_COMPLAINT',
-            coloc_id,
-            complaint_id: String(complaint._id),
-            message: 'Nouvelle plainte signalée dans la colocation',
-        }));
+        await publisher.publish(
+            'sodalis_events',
+            JSON.stringify({
+                type: 'NEW_COMPLAINT',
+                coloc_id,
+                complaint_id: String(complaint._id),
+                message: 'Nouvelle plainte signalée dans la colocation',
+            }),
+        );
 
         if (complaint.target_id) {
-            await publisher.publish('sodalis_events', JSON.stringify({
-                type: 'COMPLAINT_TARGETED',
-                coloc_id,
-                target_id: String(complaint.target_id),
-                complaint_id: String(complaint._id),
-                message: 'Vous avez été mentionné dans une plainte',
-            }));
+            await publisher.publish(
+                'sodalis_events',
+                JSON.stringify({
+                    type: 'COMPLAINT_TARGETED',
+                    coloc_id,
+                    target_id: String(complaint.target_id),
+                    complaint_id: String(complaint._id),
+                    message: 'Vous avez été mentionné dans une plainte',
+                }),
+            );
         }
 
         logger.info({ coloc_id, complaint_id: complaint._id }, 'Nouvelle plainte créée');
@@ -80,7 +86,9 @@ router.patch('/complaints/:id/resolve', async (req, res, next) => {
         checkColoc(req.user, complaint.coloc_id);
 
         if (!canActOnComplaint(req.user, complaint)) {
-            return res.status(403).json({ error: 'Seul le créateur ou un ADMIN peut résoudre cette plainte' });
+            return res
+                .status(403)
+                .json({ error: 'Seul le créateur ou un ADMIN peut résoudre cette plainte' });
         }
 
         complaint.status = 'RESOLVED';
@@ -88,12 +96,15 @@ router.patch('/complaints/:id/resolve', async (req, res, next) => {
 
         await incrementKarma(req.user.id, complaint.coloc_id, 5);
 
-        await publisher.publish('sodalis_events', JSON.stringify({
-            type: 'COMPLAINT_RESOLVED',
-            coloc_id: String(complaint.coloc_id),
-            complaint_id: String(complaint._id),
-            message: 'Une plainte a été résolue',
-        }));
+        await publisher.publish(
+            'sodalis_events',
+            JSON.stringify({
+                type: 'COMPLAINT_RESOLVED',
+                coloc_id: String(complaint.coloc_id),
+                complaint_id: String(complaint._id),
+                message: 'Une plainte a été résolue',
+            }),
+        );
 
         logger.info({ complaint_id: complaint._id }, 'Plainte résolue');
         res.json(sanitize(complaint));
@@ -110,19 +121,24 @@ router.delete('/complaints/:id', async (req, res, next) => {
         checkColoc(req.user, complaint.coloc_id);
 
         if (!canActOnComplaint(req.user, complaint)) {
-            return res.status(403).json({ error: 'Seul le créateur ou un ADMIN peut supprimer cette plainte' });
+            return res
+                .status(403)
+                .json({ error: 'Seul le créateur ou un ADMIN peut supprimer cette plainte' });
         }
 
         const coloc_id = String(complaint.coloc_id);
         const complaint_id = String(complaint._id);
         await complaint.deleteOne();
 
-        await publisher.publish('sodalis_events', JSON.stringify({
-            type: 'COMPLAINT_DELETED',
-            coloc_id,
-            complaint_id,
-            message: 'Une plainte a été supprimée',
-        }));
+        await publisher.publish(
+            'sodalis_events',
+            JSON.stringify({
+                type: 'COMPLAINT_DELETED',
+                coloc_id,
+                complaint_id,
+                message: 'Une plainte a été supprimée',
+            }),
+        );
 
         logger.info({ complaint_id: req.params.id }, 'Plainte supprimée');
         res.json({ success: true, coloc_id });
@@ -167,13 +183,16 @@ router.post('/polls', async (req, res, next) => {
             options: options.map((text) => ({ option_id: randomUUID(), text, voters: [] })),
         });
 
-        await publisher.publish('sodalis_events', JSON.stringify({
-            type: 'NEW_POLL',
-            coloc_id,
-            poll_id: String(poll._id),
-            question: poll.question,
-            message: `Nouveau sondage : ${poll.question}`,
-        }));
+        await publisher.publish(
+            'sodalis_events',
+            JSON.stringify({
+                type: 'NEW_POLL',
+                coloc_id,
+                poll_id: String(poll._id),
+                question: poll.question,
+                message: `Nouveau sondage : ${poll.question}`,
+            }),
+        );
 
         logger.info({ coloc_id, poll_id: poll._id }, 'Nouveau sondage créé');
         res.status(201).json(toPollObject(poll));
@@ -209,13 +228,16 @@ router.post('/polls/:id/vote', async (req, res, next) => {
 
         await incrementKarma(req.user.id, poll.coloc_id, 2);
 
-        await publisher.publish('sodalis_events', JSON.stringify({
-            type: 'POLL_UPDATED',
-            coloc_id: String(poll.coloc_id),
-            poll_id: String(poll._id),
-            question: poll.question,
-            message: `Un vote a été enregistré sur le sondage : ${poll.question}`,
-        }));
+        await publisher.publish(
+            'sodalis_events',
+            JSON.stringify({
+                type: 'POLL_UPDATED',
+                coloc_id: String(poll.coloc_id),
+                poll_id: String(poll._id),
+                question: poll.question,
+                message: `Un vote a été enregistré sur le sondage : ${poll.question}`,
+            }),
+        );
 
         logger.info({ poll_id: poll._id, option_id, user_id: userId }, 'Vote enregistré');
         res.json(toPollObject(poll));

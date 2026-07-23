@@ -11,18 +11,27 @@ const router = Router();
 const VALID_STATUSES = ['TODO', 'IN_PROGRESS', 'DONE'];
 
 // POST /tasks — Créer une tâche
-router.post('/',
+router.post(
+    '/',
     auth,
-    body('title').trim().isLength({ min: 1, max: 150 }).withMessage('Titre requis (1-150 caractères)'),
+    body('title')
+        .trim()
+        .isLength({ min: 1, max: 150 })
+        .withMessage('Titre requis (1-150 caractères)'),
     body('assignee_id').isUUID().withMessage('assignee_id doit être un UUID valide'),
     body('coloc_id').isUUID().withMessage('coloc_id doit être un UUID valide'),
-    body('due_at').optional({ nullable: true }).isISO8601().withMessage('due_at doit être une date ISO 8601 valide'),
+    body('due_at')
+        .optional({ nullable: true })
+        .isISO8601()
+        .withMessage('due_at doit être une date ISO 8601 valide'),
     validate,
     async (req, res, next) => {
         const { title, assignee_id, coloc_id, due_at } = req.body;
 
         if (req.user.coloc_id !== coloc_id) {
-            return res.status(403).json({ error: 'Non autorisé — Vous n\'appartenez pas à cette colocation' });
+            return res
+                .status(403)
+                .json({ error: "Non autorisé — Vous n'appartenez pas à cette colocation" });
         }
 
         try {
@@ -37,11 +46,14 @@ router.post('/',
                 [title, assignee_id, coloc_id, due_at || null],
             );
 
-            await publisher.publish('sodalis_events', JSON.stringify({
-                type: 'NEW_TASK',
-                coloc_id,
-                message: `Nouvelle tâche assignée : ${title}`,
-            }));
+            await publisher.publish(
+                'sodalis_events',
+                JSON.stringify({
+                    type: 'NEW_TASK',
+                    coloc_id,
+                    message: `Nouvelle tâche assignée : ${title}`,
+                }),
+            );
 
             await publisher.del(`dashboard_coloc_${coloc_id}`);
 
@@ -53,10 +65,13 @@ router.post('/',
 );
 
 // PATCH /tasks/:id/status — Mettre à jour le statut d'une tâche
-router.patch('/:id/status',
+router.patch(
+    '/:id/status',
     auth,
     param('id').isUUID().withMessage('id doit être un UUID valide'),
-    body('status').isIn(VALID_STATUSES).withMessage(`status doit être : ${VALID_STATUSES.join(', ')}`),
+    body('status')
+        .isIn(VALID_STATUSES)
+        .withMessage(`status doit être : ${VALID_STATUSES.join(', ')}`),
     validate,
     async (req, res, next) => {
         const { status } = req.body;
@@ -74,7 +89,9 @@ router.patch('/:id/status',
             const task = rows[0];
 
             if (req.user.coloc_id !== task.coloc_id) {
-                return res.status(403).json({ error: 'Non autorisé — Vous n\'appartenez pas à cette colocation' });
+                return res
+                    .status(403)
+                    .json({ error: "Non autorisé — Vous n'appartenez pas à cette colocation" });
             }
 
             const { rows: updated } = await pool.query(
@@ -82,25 +99,31 @@ router.patch('/:id/status',
                 [status, req.params.id],
             );
 
-            await publisher.publish('sodalis_events', JSON.stringify({
-                type: 'TASK_UPDATED',
-                coloc_id: task.coloc_id,
-                task_id: task.id,
-                status,
-                message: `Tâche "${task.title}" mise à jour : ${status}`,
-            }));
+            await publisher.publish(
+                'sodalis_events',
+                JSON.stringify({
+                    type: 'TASK_UPDATED',
+                    coloc_id: task.coloc_id,
+                    task_id: task.id,
+                    status,
+                    message: `Tâche "${task.title}" mise à jour : ${status}`,
+                }),
+            );
 
             if (status === 'DONE' && task.status !== 'DONE') {
-                const is_on_time = task.due_at ? (new Date() <= new Date(task.due_at)) : false;
+                const is_on_time = task.due_at ? new Date() <= new Date(task.due_at) : false;
                 const points = is_on_time ? 10 : 2;
-                await publisher.publish('sodalis_events', JSON.stringify({
-                    type: 'TASK_COMPLETED_SCORE_UPDATE',
-                    user_id: task.assignee_id,
-                    coloc_id: task.coloc_id,
-                    is_on_time,
-                    points,
-                    message: 'Score harmony mis à jour',
-                }));
+                await publisher.publish(
+                    'sodalis_events',
+                    JSON.stringify({
+                        type: 'TASK_COMPLETED_SCORE_UPDATE',
+                        user_id: task.assignee_id,
+                        coloc_id: task.coloc_id,
+                        is_on_time,
+                        points,
+                        message: 'Score harmony mis à jour',
+                    }),
+                );
             }
 
             await publisher.del(`dashboard_coloc_${task.coloc_id}`);
@@ -121,7 +144,9 @@ router.get('/', auth, async (req, res, next) => {
     }
 
     if (req.user.coloc_id !== coloc_id) {
-        return res.status(403).json({ error: 'Non autorisé — Vous n\'appartenez pas à cette colocation' });
+        return res
+            .status(403)
+            .json({ error: "Non autorisé — Vous n'appartenez pas à cette colocation" });
     }
 
     try {
@@ -139,11 +164,13 @@ router.get('/', auth, async (req, res, next) => {
 // GET /tasks/coloc/:id — Lister les tâches avec pagination (utilisé par la Gateway)
 router.get('/coloc/:id', auth, async (req, res, next) => {
     if (req.user.coloc_id !== req.params.id) {
-        return res.status(403).json({ error: 'Non autorisé — Vous n\'appartenez pas à cette colocation' });
+        return res
+            .status(403)
+            .json({ error: "Non autorisé — Vous n'appartenez pas à cette colocation" });
     }
 
-    const page   = Math.max(1, parseInt(req.query.page)  || 1);
-    const limit  = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
     const offset = (page - 1) * limit;
 
     try {
@@ -152,10 +179,7 @@ router.get('/coloc/:id', auth, async (req, res, next) => {
                 'SELECT * FROM tasks WHERE coloc_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3',
                 [req.params.id, limit, offset],
             ),
-            pool.query(
-                'SELECT COUNT(*) AS total FROM tasks WHERE coloc_id = $1',
-                [req.params.id],
-            ),
+            pool.query('SELECT COUNT(*) AS total FROM tasks WHERE coloc_id = $1', [req.params.id]),
         ]);
 
         res.json({ data: rows, pagination: { page, limit, total: parseInt(countRows[0].total) } });

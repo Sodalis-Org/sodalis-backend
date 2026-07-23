@@ -20,13 +20,15 @@ const resolvers = {
 
         usersByColoc: async (_, { colocId }, { user, req }) => {
             if (!user || (user.role !== 'ADMIN' && user.coloc_id !== colocId)) {
-                throw new Error('Non autorisé — Vous n\'appartenez pas à cette colocation');
+                throw new Error("Non autorisé — Vous n'appartenez pas à cette colocation");
             }
 
             const authHeader = { Authorization: req.headers.authorization };
             const [usersRes, karmaRes] = await Promise.all([
                 axios.get(`${DOMUS_URL}/colocs/${colocId}/users`, { headers: authHeader }),
-                axios.get(`${CONCORDIA_URL}/api/karma?coloc_id=${colocId}`, { headers: authHeader }),
+                axios.get(`${CONCORDIA_URL}/api/karma?coloc_id=${colocId}`, {
+                    headers: authHeader,
+                }),
             ]);
 
             const karmaMap = {};
@@ -37,7 +39,7 @@ const resolvers = {
 
         notifications: async (_, { colocId, page = 1, limit = 20 }, { user, req }) => {
             if (!user || (user.role !== 'ADMIN' && user.coloc_id !== colocId)) {
-                throw new Error('Non autorisé — Vous n\'appartenez pas à cette colocation');
+                throw new Error("Non autorisé — Vous n'appartenez pas à cette colocation");
             }
 
             const { data } = await axios.get(
@@ -49,7 +51,7 @@ const resolvers = {
 
         maintenanceTickets: async (_, { colocId }, { user, req }) => {
             if (!user || (user.role !== 'ADMIN' && user.coloc_id !== colocId)) {
-                throw new Error('Non autorisé — Vous n\'appartenez pas à cette colocation');
+                throw new Error("Non autorisé — Vous n'appartenez pas à cette colocation");
             }
 
             const { data } = await axios.get(`${DOMUS_URL}/maintenance?coloc_id=${colocId}`, {
@@ -60,7 +62,7 @@ const resolvers = {
 
         tasksByColoc: async (_, { colocId }, { user, req }) => {
             if (!user || (user.role !== 'ADMIN' && user.coloc_id !== colocId)) {
-                throw new Error('Non autorisé — Vous n\'appartenez pas à cette colocation');
+                throw new Error("Non autorisé — Vous n'appartenez pas à cette colocation");
             }
 
             const { data } = await axios.get(`${LABOR_URL}/tasks/coloc/${colocId}`, {
@@ -71,7 +73,7 @@ const resolvers = {
 
         complaints: async (_, { colocId }, { user, req }) => {
             if (!user || (user.role !== 'ADMIN' && user.coloc_id !== colocId)) {
-                throw new Error('Non autorisé — Vous n\'appartenez pas à cette colocation');
+                throw new Error("Non autorisé — Vous n'appartenez pas à cette colocation");
             }
             const { data } = await axios.get(
                 `${CONCORDIA_URL}/api/complaints?coloc_id=${colocId}`,
@@ -82,18 +84,17 @@ const resolvers = {
 
         polls: async (_, { colocId }, { user, req }) => {
             if (!user || (user.role !== 'ADMIN' && user.coloc_id !== colocId)) {
-                throw new Error('Non autorisé — Vous n\'appartenez pas à cette colocation');
+                throw new Error("Non autorisé — Vous n'appartenez pas à cette colocation");
             }
-            const { data } = await axios.get(
-                `${CONCORDIA_URL}/api/polls?coloc_id=${colocId}`,
-                { headers: { Authorization: req.headers.authorization } },
-            );
+            const { data } = await axios.get(`${CONCORDIA_URL}/api/polls?coloc_id=${colocId}`, {
+                headers: { Authorization: req.headers.authorization },
+            });
             return data;
         },
 
         getColocDashboard: async (_, { colocId }, { user, req }) => {
             if (!user || (user.role !== 'ADMIN' && user.coloc_id !== colocId)) {
-                throw new Error('Non autorisé — Vous n\'appartenez pas à cette colocation');
+                throw new Error("Non autorisé — Vous n'appartenez pas à cette colocation");
             }
 
             const cacheKey = `dashboard_coloc_${colocId}`;
@@ -110,15 +111,22 @@ const resolvers = {
             const [usersRes, tasksRes, complaintsRes, karmaRes] = await Promise.all([
                 axios.get(`${DOMUS_URL}/colocs/${colocId}/users`, { headers: authHeader }),
                 axios.get(`${LABOR_URL}/tasks/coloc/${colocId}`, { headers: authHeader }),
-                axios.get(`${CONCORDIA_URL}/api/complaints?coloc_id=${colocId}&status=OPEN`, { headers: authHeader }),
-                axios.get(`${CONCORDIA_URL}/api/karma?coloc_id=${colocId}`, { headers: authHeader }),
+                axios.get(`${CONCORDIA_URL}/api/complaints?coloc_id=${colocId}&status=OPEN`, {
+                    headers: authHeader,
+                }),
+                axios.get(`${CONCORDIA_URL}/api/karma?coloc_id=${colocId}`, {
+                    headers: authHeader,
+                }),
             ]);
 
             const karmaMap = {};
             for (const profile of karmaRes.data) karmaMap[String(profile.user_id)] = profile.score;
 
             const dashboard = {
-                users: usersRes.data.map((u) => ({ ...u, karma_score: karmaMap[String(u.id)] ?? 0 })),
+                users: usersRes.data.map((u) => ({
+                    ...u,
+                    karma_score: karmaMap[String(u.id)] ?? 0,
+                })),
                 tasks: tasksRes.data.data || tasksRes.data,
                 open_complaints: complaintsRes.data.length,
             };
@@ -131,7 +139,11 @@ const resolvers = {
 
     Mutation: {
         register: async (_, { name, email, password }) => {
-            const { data } = await axios.post(`${DOMUS_URL}/auth/register`, { name, email, password });
+            const { data } = await axios.post(`${DOMUS_URL}/auth/register`, {
+                name,
+                email,
+                password,
+            });
             return data;
         },
 
@@ -161,7 +173,7 @@ const resolvers = {
 
         createTask: async (_, { title, assignee_id, coloc_id, due_at }, { user, req }) => {
             if (!user || (user.role !== 'ADMIN' && user.coloc_id !== coloc_id)) {
-                throw new Error('Non autorisé — Vous n\'appartenez pas à cette colocation');
+                throw new Error("Non autorisé — Vous n'appartenez pas à cette colocation");
             }
             const { data } = await axios.post(
                 `${LABOR_URL}/tasks`,
@@ -181,7 +193,11 @@ const resolvers = {
             return data;
         },
 
-        createMaintenanceTicket: async (_, { title, description, category, priority, coloc_id }, { user, req }) => {
+        createMaintenanceTicket: async (
+            _,
+            { title, description, category, priority, coloc_id },
+            { user, req },
+        ) => {
             if (!user) throw new Error('Non autorisé');
             const { data } = await axios.post(
                 `${DOMUS_URL}/maintenance`,
@@ -214,7 +230,11 @@ const resolvers = {
             return data;
         },
 
-        createComplaint: async (_, { coloc_id, message, target_id, is_anonymous }, { user, req }) => {
+        createComplaint: async (
+            _,
+            { coloc_id, message, target_id, is_anonymous },
+            { user, req },
+        ) => {
             if (!user) throw new Error('Non autorisé');
             const { data } = await axios.post(
                 `${CONCORDIA_URL}/api/complaints`,
@@ -227,10 +247,9 @@ const resolvers = {
 
         deleteComplaint: async (_, { id }, { user, req }) => {
             if (!user) throw new Error('Non autorisé');
-            const { data } = await axios.delete(
-                `${CONCORDIA_URL}/api/complaints/${id}`,
-                { headers: { Authorization: req.headers.authorization } },
-            );
+            const { data } = await axios.delete(`${CONCORDIA_URL}/api/complaints/${id}`, {
+                headers: { Authorization: req.headers.authorization },
+            });
             if (data.coloc_id) await cache.del(`dashboard_coloc_${data.coloc_id}`);
             return true;
         },

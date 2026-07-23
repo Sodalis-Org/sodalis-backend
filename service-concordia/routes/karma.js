@@ -29,7 +29,9 @@ router.get('/karma', async (req, res) => {
     }
 
     if (req.user.role !== 'ADMIN' && req.user.coloc_id !== coloc_id) {
-        return res.status(403).json({ error: 'Non autorisé — Vous n\'appartenez pas à cette colocation' });
+        return res
+            .status(403)
+            .json({ error: "Non autorisé — Vous n'appartenez pas à cette colocation" });
     }
 
     try {

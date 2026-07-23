@@ -14,7 +14,8 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-
 const router = Router();
 
 // POST /colocs — Créer une coloc (transaction : crée + assigne le créateur comme ADMIN)
-router.post('/',
+router.post(
+    '/',
     auth,
     body('name').trim().isLength({ min: 1, max: 100 }).withMessage('Nom requis (1-100 caractères)'),
     validate,
@@ -37,15 +38,18 @@ router.post('/',
         try {
             await client.query('BEGIN');
 
-            const { rows: [coloc] } = await client.query(
+            const {
+                rows: [coloc],
+            } = await client.query(
                 'INSERT INTO colocs (name, invite_code) VALUES ($1, $2) RETURNING *',
                 [name, generatedCode],
             );
 
-            await client.query(
-                'UPDATE users SET coloc_id = $1, role = $2 WHERE id = $3',
-                [coloc.id, 'ADMIN', req.user.id],
-            );
+            await client.query('UPDATE users SET coloc_id = $1, role = $2 WHERE id = $3', [
+                coloc.id,
+                'ADMIN',
+                req.user.id,
+            ]);
 
             await client.query('COMMIT');
 
@@ -66,9 +70,13 @@ router.post('/',
 );
 
 // POST /colocs/join — Rejoindre une coloc via invite_code
-router.post('/join',
+router.post(
+    '/join',
     auth,
-    body('invite_code').trim().isLength({ min: 4, max: 20 }).withMessage('Code d\'invitation invalide'),
+    body('invite_code')
+        .trim()
+        .isLength({ min: 4, max: 20 })
+        .withMessage("Code d'invitation invalide"),
     validate,
     async (req, res) => {
         const { invite_code } = req.body;
@@ -83,15 +91,12 @@ router.post('/join',
         );
 
         if (rows.length === 0) {
-            return res.status(404).json({ error: 'Code d\'invitation invalide' });
+            return res.status(404).json({ error: "Code d'invitation invalide" });
         }
 
         const coloc = rows[0];
 
-        await pool.query(
-            'UPDATE users SET coloc_id = $1 WHERE id = $2',
-            [coloc.id, req.user.id],
-        );
+        await pool.query('UPDATE users SET coloc_id = $1 WHERE id = $2', [coloc.id, req.user.id]);
 
         const token = jwt.sign(
             { id: req.user.id, email: req.user.email, coloc_id: coloc.id, role: req.user.role },
@@ -110,13 +115,14 @@ router.get('/:id', auth, async (req, res) => {
         return res.status(404).json({ error: 'Colocation introuvable' });
     }
     if (!req.user.coloc_id || String(req.user.coloc_id) !== colocId) {
-        return res.status(403).json({ error: 'Non autorisé — Vous n\'appartenez pas à cette colocation' });
+        return res
+            .status(403)
+            .json({ error: "Non autorisé — Vous n'appartenez pas à cette colocation" });
     }
 
-    const { rows } = await pool.query(
-        'SELECT id, name, invite_code FROM colocs WHERE id = $1',
-        [colocId],
-    );
+    const { rows } = await pool.query('SELECT id, name, invite_code FROM colocs WHERE id = $1', [
+        colocId,
+    ]);
 
     if (rows.length === 0) {
         return res.status(404).json({ error: 'Colocation introuvable' });

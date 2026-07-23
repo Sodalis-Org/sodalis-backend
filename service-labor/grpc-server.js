@@ -25,11 +25,14 @@ async function createTask(call, callback) {
 
         const task = rows[0];
 
-        await publisher.publish('sodalis_events', JSON.stringify({
-            type: 'NEW_TASK',
-            coloc_id,
-            message: `Nouvelle tâche assignée : ${title}`,
-        }));
+        await publisher.publish(
+            'sodalis_events',
+            JSON.stringify({
+                type: 'NEW_TASK',
+                coloc_id,
+                message: `Nouvelle tâche assignée : ${title}`,
+            }),
+        );
 
         await publisher.del(`dashboard_coloc_${coloc_id}`);
 
@@ -49,14 +52,18 @@ function startGrpcServer() {
         server.addService(laborProto.LaborService.service, { CreateTask: createTask });
 
         const GRPC_PORT = process.env.LABOR_GRPC_PORT || 50052;
-        server.bindAsync(`0.0.0.0:${GRPC_PORT}`, grpc.ServerCredentials.createInsecure(), (err, port) => {
-            if (err) {
-                logger.error({ err }, 'Erreur démarrage gRPC Labor');
-                return reject(err);
-            }
-            logger.info(`Serveur gRPC Labor → port ${port}`);
-            resolve(server);
-        });
+        server.bindAsync(
+            `0.0.0.0:${GRPC_PORT}`,
+            grpc.ServerCredentials.createInsecure(),
+            (err, port) => {
+                if (err) {
+                    logger.error({ err }, 'Erreur démarrage gRPC Labor');
+                    return reject(err);
+                }
+                logger.info(`Serveur gRPC Labor → port ${port}`);
+                resolve(server);
+            },
+        );
     });
 }
 

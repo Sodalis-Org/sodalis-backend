@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm pack *)",
+      "Bash(tar xzf *)",
+      "Bash(node -e \"const p = require\\('./package/lib/index.js'\\); console.log\\(Object.keys\\(p.configs\\)\\)\")",
+      "Bash(npm audit *)",
+      "Bash(echo \"exit code: $?\")",
+      "Bash(npm run *)",
+      "Bash(npx prettier *)",
+      "Bash(npx vitest *)",
+      "Bash(node -e ' *)",
+      "Bash(chmod +x \"/Users/linerolt/Documents/Ynov/Web service/Sodalis/sodalis-backend/scripts/startup-check.sh\" \"/Users/linerolt/Documents/Ynov/Web service/Sodalis/sodalis-backend/scripts/perf-check.js\")",
+      "Bash(npx eslint *)",
+      "Bash(command -v shellcheck)",
+      "Bash(shellcheck scripts/startup-check.sh)",
+      "Bash(docker info *)",
+      "Bash(docker-compose config *)",
+      "Bash(echo \"LINT EXIT: $?\")",
+      "Bash(echo \"TEST EXIT: $?\")",
+      "Bash(echo \"AUDIT EXIT: $?\")",
+      "Read(//tmp/**)"
+    ]
+  }
+}

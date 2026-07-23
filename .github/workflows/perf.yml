@@ -1,0 +1,41 @@
+name: Perf & startup checks
+
+# Déclenchement manuel uniquement : ces checks nécessitent la stack docker-compose
+# complète (Postgres x2, MongoDB, Redis, 4 services) et sont trop coûteux pour tourner
+# sur chaque push. Voir QUALITY.md pour le détail des seuils.
+on:
+    workflow_dispatch: {}
+
+jobs:
+    perf:
+        name: Startup time & P95 getColocDashboard
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: '22'
+                  cache: npm
+
+            - name: Install dependencies
+              run: npm ci
+
+            - name: Générer un .env pour docker-compose
+              run: |
+                  cp .env.example .env
+                  sed -i "s/change_me_to_a_random_64_char_hex/$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")/" .env
+                  sed -i "s/change_me_in_production/$(node -e "console.log(require('crypto').randomBytes(16).toString('hex'))")/" .env
+
+            - name: Démarrage de la stack (< 60s)
+              run: npm run startup:check
+
+            - name: P95 getColocDashboard (< 200ms)
+              run: npm run perf:check
+
+            - name: Arrêt de la stack
+              if: always()
+              run: docker-compose down -v

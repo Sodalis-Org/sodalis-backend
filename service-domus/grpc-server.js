@@ -24,9 +24,10 @@ async function verifyUser(call, callback) {
 
         callback(null, {
             is_valid: rowCount > 0,
-            message: rowCount > 0
-                ? 'Utilisateur validé'
-                : "L'utilisateur n'appartient pas à cette colocation",
+            message:
+                rowCount > 0
+                    ? 'Utilisateur validé'
+                    : "L'utilisateur n'appartient pas à cette colocation",
         });
     } catch (err) {
         callback(err);
@@ -39,14 +40,18 @@ function startGrpcServer() {
         server.addService(domusProto.DomusService.service, { VerifyUser: verifyUser });
 
         const GRPC_PORT = process.env.GRPC_PORT || 50051;
-        server.bindAsync(`0.0.0.0:${GRPC_PORT}`, grpc.ServerCredentials.createInsecure(), (err, port) => {
-            if (err) {
-                logger.error({ err }, 'Erreur démarrage gRPC Domus');
-                return reject(err);
-            }
-            logger.info(`Serveur gRPC Domus → port ${port}`);
-            resolve(server);
-        });
+        server.bindAsync(
+            `0.0.0.0:${GRPC_PORT}`,
+            grpc.ServerCredentials.createInsecure(),
+            (err, port) => {
+                if (err) {
+                    logger.error({ err }, 'Erreur démarrage gRPC Domus');
+                    return reject(err);
+                }
+                logger.info(`Serveur gRPC Domus → port ${port}`);
+                resolve(server);
+            },
+        );
     });
 }
 

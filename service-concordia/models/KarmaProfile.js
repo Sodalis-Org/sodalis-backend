@@ -2,9 +2,9 @@ const mongoose = require('mongoose');
 
 const karmaProfileSchema = new mongoose.Schema(
     {
-        user_id:  { type: String, required: true },
+        user_id: { type: String, required: true },
         coloc_id: { type: String, required: true },
-        score:    { type: Number, default: 0 },
+        score: { type: Number, default: 0 },
     },
     { timestamps: true },
 );

@@ -11,15 +11,23 @@ const router = Router();
 
 const VALID_CATEGORIES = ['PLUMBING', 'ELECTRICITY', 'APPLIANCE', 'FURNITURE', 'INTERNET', 'OTHER'];
 const VALID_PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'];
-const VALID_STATUSES   = ['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CANCELLED'];
+const VALID_STATUSES = ['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CANCELLED'];
 
 // POST /maintenance — Créer un ticket
-router.post('/',
+router.post(
+    '/',
     auth,
-    body('title').trim().isLength({ min: 1, max: 200 }).withMessage('Titre requis (1-200 caractères)'),
+    body('title')
+        .trim()
+        .isLength({ min: 1, max: 200 })
+        .withMessage('Titre requis (1-200 caractères)'),
     body('description').optional().trim(),
-    body('category').isIn(VALID_CATEGORIES).withMessage(`category doit être : ${VALID_CATEGORIES.join(', ')}`),
-    body('priority').isIn(VALID_PRIORITIES).withMessage(`priority doit être : ${VALID_PRIORITIES.join(', ')}`),
+    body('category')
+        .isIn(VALID_CATEGORIES)
+        .withMessage(`category doit être : ${VALID_CATEGORIES.join(', ')}`),
+    body('priority')
+        .isIn(VALID_PRIORITIES)
+        .withMessage(`priority doit être : ${VALID_PRIORITIES.join(', ')}`),
     body('coloc_id').isUUID().withMessage('coloc_id doit être un UUID valide'),
     validate,
     async (req, res, next) => {
@@ -27,7 +35,9 @@ router.post('/',
         const created_by = req.user.id;
 
         if (req.user.coloc_id !== coloc_id) {
-            return res.status(403).json({ error: 'Non autorisé — Vous n\'appartenez pas à cette colocation' });
+            return res
+                .status(403)
+                .json({ error: "Non autorisé — Vous n'appartenez pas à cette colocation" });
         }
 
         try {
@@ -40,10 +50,9 @@ router.post('/',
 
             const ticket = rows[0];
 
-            const { rows: userRows } = await pool.query(
-                'SELECT name FROM users WHERE id = $1',
-                [created_by],
-            );
+            const { rows: userRows } = await pool.query('SELECT name FROM users WHERE id = $1', [
+                created_by,
+            ]);
             const creator_name = userRows[0]?.name ?? 'Inconnu';
 
             // Escalade automatique via gRPC pour les tickets URGENT
@@ -60,15 +69,18 @@ router.post('/',
                 }
             }
 
-            await publisher.publish('sodalis_events', JSON.stringify({
-                type: 'NEW_MAINTENANCE_TICKET',
-                coloc_id,
-                ticket_id: ticket.id,
-                title,
-                priority,
-                creator_name,
-                message: `Nouveau ticket [${priority}] signalé par ${creator_name} : ${title}`,
-            }));
+            await publisher.publish(
+                'sodalis_events',
+                JSON.stringify({
+                    type: 'NEW_MAINTENANCE_TICKET',
+                    coloc_id,
+                    ticket_id: ticket.id,
+                    title,
+                    priority,
+                    creator_name,
+                    message: `Nouveau ticket [${priority}] signalé par ${creator_name} : ${title}`,
+                }),
+            );
 
             await publisher.del(`dashboard_coloc_${coloc_id}`);
 
@@ -80,7 +92,8 @@ router.post('/',
 );
 
 // GET /maintenance?coloc_id=<uuid> — Lister les tickets d'une coloc
-router.get('/',
+router.get(
+    '/',
     auth,
     query('coloc_id').isUUID().withMessage('coloc_id est requis et doit être un UUID valide'),
     validate,
@@ -88,7 +101,9 @@ router.get('/',
         const { coloc_id } = req.query;
 
         if (req.user.coloc_id !== coloc_id) {
-            return res.status(403).json({ error: 'Non autorisé — Vous n\'appartenez pas à cette colocation' });
+            return res
+                .status(403)
+                .json({ error: "Non autorisé — Vous n'appartenez pas à cette colocation" });
         }
 
         try {
@@ -105,10 +120,13 @@ router.get('/',
 );
 
 // PATCH /maintenance/:id/status — Mettre à jour le statut
-router.patch('/:id/status',
+router.patch(
+    '/:id/status',
     auth,
     param('id').isInt({ min: 1 }).withMessage('id doit être un entier valide'),
-    body('status').isIn(VALID_STATUSES).withMessage(`status doit être : ${VALID_STATUSES.join(', ')}`),
+    body('status')
+        .isIn(VALID_STATUSES)
+        .withMessage(`status doit être : ${VALID_STATUSES.join(', ')}`),
     validate,
     async (req, res, next) => {
         const { status } = req.body;
@@ -127,7 +145,9 @@ router.patch('/:id/status',
             const ticket = rows[0];
 
             if (req.user.coloc_id !== ticket.coloc_id) {
-                return res.status(403).json({ error: 'Non autorisé — Vous n\'appartenez pas à cette colocation' });
+                return res
+                    .status(403)
+                    .json({ error: "Non autorisé — Vous n'appartenez pas à cette colocation" });
             }
 
             const { rows: updated } = await pool.query(
@@ -135,13 +155,16 @@ router.patch('/:id/status',
                 [status, id],
             );
 
-            await publisher.publish('sodalis_events', JSON.stringify({
-                type: 'MAINTENANCE_TICKET_UPDATED',
-                coloc_id: ticket.coloc_id,
-                ticket_id: ticket.id,
-                status,
-                message: `Ticket "${ticket.title}" mis à jour : ${status}`,
-            }));
+            await publisher.publish(
+                'sodalis_events',
+                JSON.stringify({
+                    type: 'MAINTENANCE_TICKET_UPDATED',
+                    coloc_id: ticket.coloc_id,
+                    ticket_id: ticket.id,
+                    status,
+                    message: `Ticket "${ticket.title}" mis à jour : ${status}`,
+                }),
+            );
 
             await publisher.del(`dashboard_coloc_${ticket.coloc_id}`);
 
@@ -153,7 +176,8 @@ router.patch('/:id/status',
 );
 
 // PATCH /maintenance/:id/assign — Assigner un ticket (ADMIN de la coloc uniquement)
-router.patch('/:id/assign',
+router.patch(
+    '/:id/assign',
     auth,
     param('id').isInt({ min: 1 }).withMessage('id doit être un entier valide'),
     body('assigned_to').isUUID().withMessage('assigned_to doit être un UUID valide'),
@@ -179,7 +203,11 @@ router.patch('/:id/assign',
             const ticket = rows[0];
 
             if (req.user.coloc_id !== ticket.coloc_id) {
-                return res.status(403).json({ error: 'Non autorisé — Ce ticket n\'appartient pas à votre colocation' });
+                return res
+                    .status(403)
+                    .json({
+                        error: "Non autorisé — Ce ticket n'appartient pas à votre colocation",
+                    });
             }
 
             const { rowCount } = await pool.query(
@@ -188,7 +216,9 @@ router.patch('/:id/assign',
             );
 
             if (rowCount === 0) {
-                return res.status(400).json({ error: 'L\'utilisateur assigné n\'appartient pas à cette colocation' });
+                return res
+                    .status(400)
+                    .json({ error: "L'utilisateur assigné n'appartient pas à cette colocation" });
             }
 
             const { rows: updated } = await pool.query(
@@ -196,13 +226,16 @@ router.patch('/:id/assign',
                 [assigned_to, id],
             );
 
-            await publisher.publish('sodalis_events', JSON.stringify({
-                type: 'MAINTENANCE_TICKET_ASSIGNED',
-                coloc_id: ticket.coloc_id,
-                ticket_id: ticket.id,
-                assigned_to,
-                message: `Ticket "${ticket.title}" assigné à un membre de la colocation`,
-            }));
+            await publisher.publish(
+                'sodalis_events',
+                JSON.stringify({
+                    type: 'MAINTENANCE_TICKET_ASSIGNED',
+                    coloc_id: ticket.coloc_id,
+                    ticket_id: ticket.id,
+                    assigned_to,
+                    message: `Ticket "${ticket.title}" assigné à un membre de la colocation`,
+                }),
+            );
 
             await publisher.del(`dashboard_coloc_${ticket.coloc_id}`);
 

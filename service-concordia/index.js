@@ -1,53 +1,15 @@
 require('dotenv').config();
 
-const express = require('express');
 const http = require('http');
-const cors = require('cors');
 const { Server } = require('socket.io');
 const mongoose = require('mongoose');
 const redis = require('redis');
-const pinoHttp = require('pino-http');
 const logger = require('./logger');
 const Notification = require('./models/Notification');
-const auth = require('./middleware/auth');
-const socialRoutes = require('./routes/social');
-const karmaRoutes  = require('./routes/karma');
-const publisher    = require('./redis-publisher');
+const publisher = require('./redis-publisher');
+const { createApp, corsOriginValidator } = require('./app');
 
-function parseCorsOriginsFromEnv() {
-    const rawList = process.env.CORS_ORIGINS;
-    const rawSingle = process.env.CORS_ORIGIN;
-
-    const list = (rawList || '')
-        .split(',')
-        .map((s) => s.trim())
-        .filter(Boolean);
-
-    if (list.length > 0) return new Set(list);
-    if (rawSingle && rawSingle.trim()) return new Set([rawSingle.trim()]);
-
-    return new Set(['http://localhost:3000']);
-}
-
-const CORS_ORIGINS = parseCorsOriginsFromEnv();
-function corsOriginValidator(origin, cb) {
-    // Autorise les requêtes sans header Origin (curl / server-to-server)
-    if (!origin) return cb(null, true);
-    if (CORS_ORIGINS.has(origin)) return cb(null, true);
-    return cb(new Error(`CORS refusé pour l'origine: ${origin}`));
-}
-
-const app = express();
-app.use(
-    cors({
-        origin: corsOriginValidator,
-        credentials: true,
-        optionsSuccessStatus: 204,
-    }),
-);
-app.use(pinoHttp({ logger }));
-app.use(express.json());
-
+const app = createApp();
 const server = http.createServer(app);
 const io = new Server(server, {
     cors: {
@@ -56,11 +18,9 @@ const io = new Server(server, {
     },
 });
 
-app.use('/api', auth, socialRoutes);
-app.use('/api', auth, karmaRoutes);
-
 // ── MongoDB ──────────────────────────────────────────────────
-mongoose.connect(process.env.MONGO_URL || 'mongodb://localhost:27017/concordia_db')
+mongoose
+    .connect(process.env.MONGO_URL || 'mongodb://localhost:27017/concordia_db')
     .then(() => logger.info('Concordia connecté à MongoDB'))
     .catch((err) => logger.error({ err }, 'Erreur MongoDB'));
 
@@ -99,18 +59,22 @@ subscriber.connect().then(async () => {
                 type: event.type,
                 message: event.message,
                 ...(event.task_id && { task_id: event.task_id }),
-                ...(event.status  && { status: event.status }),
+                ...(event.status && { status: event.status }),
             });
         }
 
-        const MAINTENANCE_EVENTS = ['NEW_MAINTENANCE_TICKET', 'MAINTENANCE_TICKET_UPDATED', 'MAINTENANCE_TICKET_ASSIGNED'];
+        const MAINTENANCE_EVENTS = [
+            'NEW_MAINTENANCE_TICKET',
+            'MAINTENANCE_TICKET_UPDATED',
+            'MAINTENANCE_TICKET_ASSIGNED',
+        ];
         if (MAINTENANCE_EVENTS.includes(event.type)) {
             io.emit(`coloc_${event.coloc_id}_notifications`, {
                 type: event.type,
                 message: event.message,
-                ...(event.ticket_id   && { ticket_id: event.ticket_id }),
-                ...(event.priority    && { priority: event.priority }),
-                ...(event.status      && { status: event.status }),
+                ...(event.ticket_id && { ticket_id: event.ticket_id }),
+                ...(event.priority && { priority: event.priority }),
+                ...(event.status && { status: event.status }),
                 ...(event.assigned_to && { assigned_to: event.assigned_to }),
             });
         }
@@ -135,7 +99,7 @@ subscriber.connect().then(async () => {
             io.emit(`coloc_${event.coloc_id}_notifications`, {
                 type: event.type,
                 message: event.message,
-                ...(event.poll_id  && { poll_id: event.poll_id }),
+                ...(event.poll_id && { poll_id: event.poll_id }),
                 ...(event.question && { question: event.question }),
             });
         }
@@ -151,50 +115,10 @@ subscriber.connect().then(async () => {
     });
 });
 
-// ── Routes ───────────────────────────────────────────────────
-app.get('/notifications/coloc/:id', auth, async (req, res) => {
-    if (req.user.role !== 'ADMIN' && req.user.coloc_id !== req.params.id) {
-        return res.status(403).json({ error: 'Non autorisé — Vous n\'appartenez pas à cette colocation' });
-    }
-
-    const page  = Math.max(1, parseInt(req.query.page)  || 1);
-    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
-    const skip  = (page - 1) * limit;
-
-    try {
-        const [notifications, total] = await Promise.all([
-            Notification.find({ coloc_id: req.params.id })
-                .sort({ created_at: -1 })
-                .skip(skip)
-                .limit(limit),
-            Notification.countDocuments({ coloc_id: req.params.id }),
-        ]);
-        res.json({ data: notifications, pagination: { page, limit, total } });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
 // ── WebSockets ───────────────────────────────────────────────
 io.on('connection', (socket) => {
     logger.info({ socketId: socket.id }, 'Client connecté');
     socket.on('disconnect', () => logger.info({ socketId: socket.id }, 'Client déconnecté'));
-});
-
-// ── Health check ─────────────────────────────────────────────
-app.get('/health', (_req, res) => {
-    res.json({
-        status: 'ok',
-        mongo: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
-    });
-});
-
-// ── Global Error Handler ─────────────────────────────────────
-app.use((err, _req, res, _next) => {
-    logger.error({ err }, 'Erreur non gérée');
-    res.status(err.status || 500).json({
-        error: err.message || 'Erreur interne du serveur',
-    });
 });
 
 // ── Démarrage ────────────────────────────────────────────────
@@ -213,4 +137,4 @@ async function shutdown(signal) {
 }
 
 process.on('SIGTERM', () => shutdown('SIGTERM'));
-process.on('SIGINT',  () => shutdown('SIGINT'));
+process.on('SIGINT', () => shutdown('SIGINT'));

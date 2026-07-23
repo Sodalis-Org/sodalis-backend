@@ -20,7 +20,8 @@ const authLimiter = rateLimit({
 });
 
 // POST /auth/register — Inscription
-router.post('/register',
+router.post(
+    '/register',
     authLimiter,
     body('name').trim().isLength({ min: 1, max: 100 }).withMessage('Nom requis (1-100 caractères)'),
     body('email').isEmail().normalizeEmail().withMessage('Email invalide'),
@@ -47,7 +48,8 @@ router.post('/register',
 );
 
 // POST /auth/login — Connexion
-router.post('/login',
+router.post(
+    '/login',
     authLimiter,
     body('email').isEmail().normalizeEmail().withMessage('Email invalide'),
     body('password').notEmpty().withMessage('Mot de passe requis'),
