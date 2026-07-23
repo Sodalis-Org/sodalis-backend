@@ -2,6 +2,7 @@ require('dotenv').config();
 
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
 const pinoHttp = require('pino-http');
 const mongoose = require('mongoose');
 const logger = require('./logger');
@@ -35,6 +36,7 @@ function corsOriginValidator(origin, cb) {
 
 function createApp() {
     const app = express();
+    app.use(helmet());
     app.use(
         cors({
             origin: corsOriginValidator,

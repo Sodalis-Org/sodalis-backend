@@ -2,6 +2,7 @@ require('dotenv').config();
 
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
 const { ApolloServer } = require('@apollo/server');
 const { expressMiddleware } = require('@as-integrations/express5');
 const jwt = require('jsonwebtoken');
@@ -36,11 +37,36 @@ function corsOriginValidator(origin, cb) {
     return cb(new Error(`CORS refusé pour l'origine: ${origin}`));
 }
 
+const isProduction = process.env.NODE_ENV === 'production';
+
 async function createApp() {
     const app = express();
 
-    const apolloServer = new ApolloServer({ typeDefs, resolvers });
+    const apolloServer = new ApolloServer({
+        typeDefs,
+        resolvers,
+        introspection: !isProduction,
+    });
     await apolloServer.start();
+
+    app.use(
+        isProduction
+            ? helmet({
+                  contentSecurityPolicy: {
+                      directives: {
+                          defaultSrc: ["'self'"],
+                          scriptSrc: ["'self'"],
+                          styleSrc: ["'self'"],
+                          imgSrc: ["'self'"],
+                          connectSrc: ["'self'"],
+                          frameAncestors: ["'none'"],
+                      },
+                  },
+              })
+            : // Le Sandbox Apollo (landing page GraphQL en dev) charge un iframe
+              // et des scripts depuis apollographql.com — CSP désactivée en dev uniquement.
+              helmet({ contentSecurityPolicy: false }),
+    );
 
     app.use(pinoHttp({ logger }));
 

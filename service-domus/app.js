@@ -1,6 +1,7 @@
 require('dotenv').config();
 
 const express = require('express');
+const helmet = require('helmet');
 const pinoHttp = require('pino-http');
 const logger = require('./logger');
 const pool = require('./db');
@@ -12,6 +13,7 @@ const maintenanceRouter = require('./routes/maintenance');
 function createApp() {
     const app = express();
 
+    app.use(helmet());
     app.use(pinoHttp({ logger }));
     app.use(express.json());
 
