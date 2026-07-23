@@ -1,3 +1,4 @@
+const { randomUUID } = require('crypto');
 const { Router } = require('express');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
@@ -65,9 +66,9 @@ router.post(
         }
 
         const token = jwt.sign(
-            { id: user.id, email: user.email, coloc_id: user.coloc_id, role: user.role },
+            { id: user.id, email: user.email, coloc_id: user.coloc_id, role: user.role, jti: randomUUID() },
             JWT_SECRET,
-            { expiresIn: '24h' },
+            { expiresIn: '24h', algorithm: 'HS256' },
         );
 
         res.json({

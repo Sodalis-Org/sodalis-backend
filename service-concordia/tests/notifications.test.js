@@ -3,7 +3,7 @@ const jwt = require('jsonwebtoken');
 const mockRequire = require('./helpers/mockRequire');
 
 const mockNotification = { find: vi.fn(), countDocuments: vi.fn(), create: vi.fn() };
-const mockPublisher = { publish: vi.fn(), del: vi.fn(), connect: vi.fn(), quit: vi.fn() };
+const mockPublisher = { publish: vi.fn(), del: vi.fn(), get: vi.fn(), connect: vi.fn(), quit: vi.fn() };
 mockRequire(require, '../models/Notification', mockNotification);
 mockRequire(require, '../models/Complaint', { create: vi.fn(), findById: vi.fn(), find: vi.fn() });
 mockRequire(require, '../models/Poll', { create: vi.fn(), findById: vi.fn(), find: vi.fn() });

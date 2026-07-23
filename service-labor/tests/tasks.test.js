@@ -3,7 +3,7 @@ const jwt = require('jsonwebtoken');
 const mockRequire = require('./helpers/mockRequire');
 
 const mockPool = { query: vi.fn(), connect: vi.fn(), end: vi.fn() };
-const mockPublisher = { publish: vi.fn(), del: vi.fn(), connect: vi.fn(), quit: vi.fn() };
+const mockPublisher = { publish: vi.fn(), del: vi.fn(), get: vi.fn(), connect: vi.fn(), quit: vi.fn() };
 const mockGrpcClient = { verifyUser: vi.fn() };
 mockRequire(require, '../db', mockPool);
 mockRequire(require, '../redis-publisher', mockPublisher);

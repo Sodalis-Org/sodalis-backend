@@ -6,7 +6,7 @@ const mockComplaint = { create: vi.fn(), findById: vi.fn(), find: vi.fn() };
 const mockPoll = { create: vi.fn(), findById: vi.fn(), find: vi.fn() };
 const mockKarmaProfile = { find: vi.fn(), findOneAndUpdate: vi.fn() };
 const mockNotification = { find: vi.fn(), countDocuments: vi.fn(), create: vi.fn() };
-const mockPublisher = { publish: vi.fn(), del: vi.fn(), connect: vi.fn(), quit: vi.fn() };
+const mockPublisher = { publish: vi.fn(), del: vi.fn(), get: vi.fn(), connect: vi.fn(), quit: vi.fn() };
 mockRequire(require, '../models/Complaint', mockComplaint);
 mockRequire(require, '../models/Poll', mockPoll);
 mockRequire(require, '../models/KarmaProfile', mockKarmaProfile);

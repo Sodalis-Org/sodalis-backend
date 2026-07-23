@@ -1,3 +1,4 @@
+const { randomUUID } = require('crypto');
 const { Router } = require('express');
 const pool = require('../db');
 const jwt = require('jsonwebtoken');
@@ -44,9 +45,15 @@ router.post(
             await client.query('COMMIT');
 
             const token = jwt.sign(
-                { id: req.user.id, email: req.user.email, coloc_id: coloc.id, role: 'ADMIN' },
+                {
+                    id: req.user.id,
+                    email: req.user.email,
+                    coloc_id: coloc.id,
+                    role: 'ADMIN',
+                    jti: randomUUID(),
+                },
                 JWT_SECRET,
-                { expiresIn: '24h' },
+                { expiresIn: '24h', algorithm: 'HS256' },
             );
 
             res.status(201).json({ coloc, token });
@@ -89,9 +96,15 @@ router.post(
         await pool.query('UPDATE users SET coloc_id = $1 WHERE id = $2', [coloc.id, req.user.id]);
 
         const token = jwt.sign(
-            { id: req.user.id, email: req.user.email, coloc_id: coloc.id, role: req.user.role },
+            {
+                id: req.user.id,
+                email: req.user.email,
+                coloc_id: coloc.id,
+                role: req.user.role,
+                jti: randomUUID(),
+            },
             JWT_SECRET,
-            { expiresIn: '24h' },
+            { expiresIn: '24h', algorithm: 'HS256' },
         );
 
         res.json({ coloc, token });
