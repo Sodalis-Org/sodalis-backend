@@ -1,36 +1,36 @@
 {
-    "name": "sodalis-backend",
-    "private": true,
-    "version": "1.0.0",
-    "workspaces": [
-        "api-gateway",
-        "service-domus",
-        "service-labor",
-        "service-concordia"
-    ],
-    "engines": {
-        "node": ">=22"
-    },
-    "scripts": {
-        "lint": "npm run lint --workspaces --if-present",
-        "lint:fix": "npm run lint:fix --workspaces --if-present",
-        "format": "prettier --write .",
-        "format:check": "prettier --check .",
-        "test": "npm run test --workspaces --if-present",
-        "test:coverage": "npm run test:coverage --workspaces --if-present",
-        "audit": "npm audit --audit-level=high --workspaces --include-workspace-root",
-        "perf:check": "node scripts/perf-check.js",
-        "startup:check": "bash scripts/startup-check.sh"
-    },
-    "devDependencies": {
-        "@eslint/js": "^10.0.1",
-        "@vitest/coverage-v8": "^4.1.10",
-        "autocannon": "^8.0.0",
-        "eslint": "^10.7.0",
-        "eslint-config-prettier": "^10.1.8",
-        "eslint-plugin-n": "^18.2.2",
-        "prettier": "^3.9.6",
-        "supertest": "^7.2.2",
-        "vitest": "^4.1.10"
-    }
+  "name": "sodalis-backend",
+  "private": true,
+  "version": "1.0.1",
+  "workspaces": [
+    "api-gateway",
+    "service-domus",
+    "service-labor",
+    "service-concordia"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "lint": "npm run lint --workspaces --if-present",
+    "lint:fix": "npm run lint:fix --workspaces --if-present",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "npm run test --workspaces --if-present",
+    "test:coverage": "npm run test:coverage --workspaces --if-present",
+    "audit": "npm audit --audit-level=high --workspaces --include-workspace-root",
+    "perf:check": "node scripts/perf-check.js",
+    "startup:check": "bash scripts/startup-check.sh"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@vitest/coverage-v8": "^4.1.10",
+    "autocannon": "^8.0.0",
+    "eslint": "^10.7.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-n": "^18.2.2",
+    "prettier": "^3.9.6",
+    "supertest": "^7.2.2",
+    "vitest": "^4.1.10"
+  }
 }
