@@ -87,8 +87,8 @@ Déclenché par le push d'un tag `v*.*.*` ([`release.yml`](.github/workflows/rel
    `ghcr.io/<owner>/sodalis-<service>` avec trois tags : la version SemVer sans `v` (`X.Y.Z`),
    le tag Git brut (`vX.Y.Z`), et le SHA court du commit. Le tag `latest` n'est jamais utilisé —
    l'immuabilité des versions livrées est le point démontré. Un job suivant expose les packages
-   GHCR en **public** (sinon le premier publish org les laisse privés et le `docker pull` exige
-   un PAT).
+   GHCR en **public** si l'API l'autorise (sinon le job est non bloquant : rendre chaque
+   package public une fois via l'UI GitHub → Package settings → Change visibility).
 4. **Création de la GitHub Release** — le job `github-release` extrait la section correspondante
    de `CHANGELOG.md` et crée la Release GitHub associée au tag.
 5. **Récupération sur l'hôte cible** :
