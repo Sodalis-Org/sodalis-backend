@@ -160,6 +160,20 @@ Convention : chaque scénario est identifié `RF-<domaine>-<n>`. Sauf mention co
 | RF-FRONT-09 | Parcours clavier complet | — | Navigation Tab uniquement : activer le lien d'évitement (`#main-content`), ouvrir une modale (ex. création de ticket dans Chores), vérifier le piège de focus (Tab/Shift+Tab reste dans la modale), fermer avec Échap | Lien d'évitement fonctionnel, focus piégé dans la modale, fermeture Échap restaure le focus déclencheur (`useFocusTrap`) | Partiellement conforme (capture `capture2_clavier.png`) : la modale « Nouvel élément » est ouverte et le focus visible (anneau bleu) est bien positionné sur le bouton de fermeture à l'intérieur de la modale, cohérent avec un focus piégé. La capture ne démontre pas isolément le lien d'évitement ni la fermeture par Échap (séquence non capturée étape par étape) | OK (partiel) | |
 | RF-FRONT-10 | Accès direct sans coloc | Utilisateur connecté mais sans `coloc_id` | Accéder directement à `/chores` par URL | Redirection vers `/onboarding/coloc` (variante négative de `getPrivateRedirect`) | À REMPLIR APRÈS EXÉCUTION | Non exécuté | |
 
+### 4.8 Captures d'écran de la recette
+
+**RF-MAINT-08** — escalade URGENT → tâche Labor, vue compte A (Alice, ADMIN) :
+
+![Ticket urgent et tâche escaladée visibles dans Corvées](docs/captures/capture1_escalade.png)
+
+**RF-FRONT-09** — modale « Nouvel élément » ouverte, focus visible sur le bouton de fermeture :
+
+![Focus clavier visible dans la modale de création](docs/captures/capture2_clavier.png)
+
+**RF-FRONT-08 / RF-CONC-13** — vue compte B (Bob, MEMBER), notification propre et tâche partagée visible :
+
+![Vue du compte B avec badge de notification distinct](docs/captures/capture3_notif.png)
+
 ---
 
 ## 5. Tests structurels (boîte blanche)
