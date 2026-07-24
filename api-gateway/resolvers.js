@@ -209,6 +209,36 @@ const resolvers = {
             return data;
         },
 
+        colocThanks: async (_, { colocId }, { user, req }) => {
+            if (!user || (user.role !== 'ADMIN' && user.coloc_id !== colocId)) {
+                logger.warn(
+                    { userId: user?.id },
+                    "Accès refusé — appartenance à une autre colocation",
+                );
+                throw new Error("Non autorisé — Vous n'appartenez pas à cette colocation");
+            }
+            const { data } = await axios.get(
+                `${CONCORDIA_URL}/api/karma/thanks/coloc/${colocId}`,
+                { headers: forwardHeaders(req) },
+            );
+            return data;
+        },
+
+        unreadNotificationsCount: async (_, { colocId }, { user, req }) => {
+            if (!user || (user.role !== 'ADMIN' && user.coloc_id !== colocId)) {
+                logger.warn(
+                    { userId: user?.id },
+                    "Accès refusé — appartenance à une autre colocation",
+                );
+                throw new Error("Non autorisé — Vous n'appartenez pas à cette colocation");
+            }
+            const { data } = await axios.get(
+                `${CONCORDIA_URL}/notifications/coloc/${colocId}/unread-count`,
+                { headers: forwardHeaders(req) },
+            );
+            return data.count;
+        },
+
         getColocDashboard: async (_, { colocId }, { user, req }) => {
             if (!user || (user.role !== 'ADMIN' && user.coloc_id !== colocId)) {
                 logger.warn(
@@ -514,6 +544,18 @@ const resolvers = {
                 const msg = err.response?.data?.error ?? err.message;
                 throw new Error(msg, { cause: err });
             }
+        },
+
+        markNotificationsRead: async (_, { colocId }, { user, req }) => {
+            if (!user || (user.role !== 'ADMIN' && user.coloc_id !== colocId)) {
+                throw new Error("Non autorisé — Vous n'appartenez pas à cette colocation");
+            }
+            await axios.post(
+                `${CONCORDIA_URL}/notifications/coloc/${colocId}/read`,
+                {},
+                { headers: forwardHeaders(req) },
+            );
+            return true;
         },
     },
 };

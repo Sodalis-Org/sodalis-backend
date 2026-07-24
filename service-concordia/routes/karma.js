@@ -45,6 +45,38 @@ router.get('/karma/thanks', async (req, res) => {
     }
 });
 
+// GET /karma/thanks/coloc/:coloc_id — remerciements de toute la coloc (fil d'activité)
+router.get('/karma/thanks/coloc/:coloc_id', async (req, res) => {
+    const { coloc_id } = req.params;
+
+    if (req.user.role !== 'ADMIN' && req.user.coloc_id !== coloc_id) {
+        logger.warn(
+            { userId: req.user.id },
+            'Accès refusé — thanks d\'une autre colocation',
+        );
+        return res
+            .status(403)
+            .json({ error: "Non autorisé — Vous n'appartenez pas à cette colocation" });
+    }
+
+    try {
+        const logs = await ThankLog.find({ coloc_id: String(coloc_id) })
+            .sort({ createdAt: -1 })
+            .limit(100);
+
+        res.json(
+            logs.map((log) => ({
+                id: String(log._id),
+                from_id: log.from_id,
+                to_id: log.to_id,
+                createdAt: log.createdAt,
+            })),
+        );
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // POST /karma/:target_id/thank — donne +3 karma à la cible (cooldown 24h par paire)
 router.post('/karma/:target_id/thank', async (req, res) => {
     const { target_id } = req.params;

@@ -509,4 +509,69 @@ describe('resolvers.Query — autorisations', () => {
         );
         expect(result).toEqual([{ id: 'p1' }]);
     });
+
+    it("colocThanks refuse un membre d'une autre coloc", async () => {
+        await expect(
+            resolvers.Query.colocThanks(
+                null,
+                { colocId: COLOC_ID },
+                { user: { role: 'MEMBER', coloc_id: 'other' }, req },
+            ),
+        ).rejects.toThrow('Non autorisé');
+    });
+
+    it('colocThanks renvoie les remerciements de toute la coloc', async () => {
+        mockAxios.get.mockResolvedValueOnce({ data: [{ id: 't1', from_id: 'u2', to_id: 'u1' }] });
+        const result = await resolvers.Query.colocThanks(
+            null,
+            { colocId: COLOC_ID },
+            { user: { role: 'MEMBER', coloc_id: COLOC_ID }, req },
+        );
+        expect(result).toEqual([{ id: 't1', from_id: 'u2', to_id: 'u1' }]);
+    });
+
+    it("unreadNotificationsCount refuse un membre d'une autre coloc", async () => {
+        await expect(
+            resolvers.Query.unreadNotificationsCount(
+                null,
+                { colocId: COLOC_ID },
+                { user: { role: 'MEMBER', coloc_id: 'other' }, req },
+            ),
+        ).rejects.toThrow('Non autorisé');
+    });
+
+    it('unreadNotificationsCount renvoie le compteur du service Concordia', async () => {
+        mockAxios.get.mockResolvedValueOnce({ data: { count: 4 } });
+        const result = await resolvers.Query.unreadNotificationsCount(
+            null,
+            { colocId: COLOC_ID },
+            { user: { role: 'MEMBER', coloc_id: COLOC_ID }, req },
+        );
+        expect(result).toBe(4);
+    });
+});
+
+describe('resolvers.Mutation — markNotificationsRead', () => {
+    beforeEach(() => vi.clearAllMocks());
+
+    it('refuse un utilisateur non authentifié', async () => {
+        await expect(
+            resolvers.Mutation.markNotificationsRead(null, { colocId: COLOC_ID }, { user: null, req }),
+        ).rejects.toThrow('Non autorisé');
+    });
+
+    it("marque les notifications comme lues pour l'utilisateur courant", async () => {
+        mockAxios.post.mockResolvedValueOnce({ data: { last_read_at: new Date().toISOString() } });
+        const result = await resolvers.Mutation.markNotificationsRead(
+            null,
+            { colocId: COLOC_ID },
+            { user: { id: 'u1', coloc_id: COLOC_ID }, req },
+        );
+        expect(result).toBe(true);
+        expect(mockAxios.post).toHaveBeenCalledWith(
+            expect.stringContaining(`/notifications/coloc/${COLOC_ID}/read`),
+            {},
+            expect.any(Object),
+        );
+    });
 });

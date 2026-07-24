@@ -119,6 +119,33 @@ describe('karma routes', () => {
         expect(res.body[0].to_id).toBe(TARGET_ID);
     });
 
+    it('GET /api/karma/thanks/coloc/:coloc_id renvoie 403 pour une autre coloc', async () => {
+        const res = await request(app)
+            .get('/api/karma/thanks/coloc/other-coloc')
+            .set('Authorization', `Bearer ${tokenFor()}`);
+
+        expect(res.status).toBe(403);
+    });
+
+    it('GET /api/karma/thanks/coloc/:coloc_id liste les thanks de toute la coloc, pas seulement les miens', async () => {
+        mockThankLog.find.mockReturnValueOnce({
+            sort: vi.fn().mockReturnValueOnce({
+                limit: vi.fn().mockResolvedValueOnce([
+                    { _id: 'log-1', from_id: 'user-2', to_id: 'user-1', createdAt: new Date('2026-07-24T10:00:00Z') },
+                ]),
+            }),
+        });
+
+        const res = await request(app)
+            .get(`/api/karma/thanks/coloc/${COLOC_ID}`)
+            .set('Authorization', `Bearer ${tokenFor()}`);
+
+        expect(res.status).toBe(200);
+        expect(res.body).toHaveLength(1);
+        expect(res.body[0]).toMatchObject({ from_id: 'user-2', to_id: 'user-1' });
+        expect(mockThankLog.find).toHaveBeenCalledWith({ coloc_id: COLOC_ID });
+    });
+
     it('GET /api/karma renvoie 400 sans coloc_id', async () => {
         const res = await request(app)
             .get('/api/karma')

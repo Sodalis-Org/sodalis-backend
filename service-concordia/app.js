@@ -8,9 +8,22 @@ const pinoHttp = require('pino-http');
 const mongoose = require('mongoose');
 const logger = require('./logger');
 const Notification = require('./models/Notification');
+const NotificationReadState = require('./models/NotificationReadState');
 const auth = require('./middleware/auth');
 const socialRoutes = require('./routes/social');
 const karmaRoutes = require('./routes/karma');
+
+// Mongoose expose _id, pas id — le schéma GraphQL déclare Notification.id: ID! (non
+// nullable). Sans ce mapping (déjà fait pour Complaint/Poll via toPollObject/sanitize
+// dans routes/social.js), la query notifications() échoue dès qu'un document existe :
+// "Cannot return null for non-nullable field Notification.id.", ce qui rendait
+// l'historique invisible à chaque rechargement.
+function toNotificationObject(notification) {
+    const obj = notification.toObject ? notification.toObject() : { ...notification };
+    obj.id = String(obj._id);
+    delete obj._id;
+    return obj;
+}
 
 function parseCorsOriginsFromEnv() {
     const rawList = process.env.CORS_ORIGINS;
@@ -88,7 +101,53 @@ function createApp() {
                     .limit(limit),
                 Notification.countDocuments({ coloc_id: req.params.id }),
             ]);
-            res.json({ data: notifications, pagination: { page, limit, total } });
+            res.json({ data: notifications.map(toNotificationObject), pagination: { page, limit, total } });
+        } catch (err) {
+            res.status(500).json({ error: err.message });
+        }
+    });
+
+    // Curseur "lu jusqu'à" par utilisateur — pas de suivi par notification, un horodatage suffit
+    // (cf. NotificationReadState). Le badge non-lu se recalcule à partir de ce curseur au lieu
+    // de vivre uniquement en mémoire côté client (perdu à chaque refresh sinon).
+    app.get('/notifications/coloc/:id/unread-count', auth, async (req, res) => {
+        if (req.user.role !== 'ADMIN' && req.user.coloc_id !== req.params.id) {
+            return res
+                .status(403)
+                .json({ error: "Non autorisé — Vous n'appartenez pas à cette colocation" });
+        }
+
+        try {
+            const state = await NotificationReadState.findOne({
+                user_id: String(req.user.id),
+                coloc_id: req.params.id,
+            });
+            const since = state?.last_read_at ?? new Date(0);
+            const count = await Notification.countDocuments({
+                coloc_id: req.params.id,
+                created_at: { $gt: since },
+            });
+            res.json({ count });
+        } catch (err) {
+            res.status(500).json({ error: err.message });
+        }
+    });
+
+    app.post('/notifications/coloc/:id/read', auth, async (req, res) => {
+        if (req.user.role !== 'ADMIN' && req.user.coloc_id !== req.params.id) {
+            return res
+                .status(403)
+                .json({ error: "Non autorisé — Vous n'appartenez pas à cette colocation" });
+        }
+
+        try {
+            const last_read_at = new Date();
+            await NotificationReadState.findOneAndUpdate(
+                { user_id: String(req.user.id), coloc_id: req.params.id },
+                { last_read_at },
+                { upsert: true },
+            );
+            res.json({ last_read_at });
         } catch (err) {
             res.status(500).json({ error: err.message });
         }
