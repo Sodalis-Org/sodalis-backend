@@ -146,7 +146,7 @@ Depuis une image en production jusqu'au commit et au run CI qui l'ont produite :
 4. La page **Packages** du dépôt (GHCR) liste, pour chaque image, l'historique de ses tags avec la
    date de publication, permettant de recouper avec le run CI correspondant.
 
-<!-- CAPTURE : liste des packages GHCR (ghcr.io/<owner>/sodalis-*) -->
+![Liste des packages GHCR](docs/captures/ghcr-packages.png)
 
 ---
 
@@ -165,11 +165,12 @@ Depuis une image en production jusqu'au commit et au run CI qui l'ont produite :
    aux administrateurs.
 6. **Save changes**.
 
-<!-- CAPTURE : règle de protection de branche configurée sur main -->
+![Règle de protection de branche configurée sur main](docs/captures/branch-protection.png)
 
 ---
 
-## Captures à insérer
+## Captures
 
-<!-- CAPTURE : run de CI vert (jobs quality/test/security/build) sur GitHub Actions -->
-<!-- CAPTURE : docker compose -f docker-compose.prod.yml ps montrant les services "healthy" -->
+![Run CI vert (jobs quality/test/security/build) sur GitHub Actions](docs/captures/ci-green-run.png)
+
+![docker compose -f docker-compose.prod.yml ps montrant les services healthy](docs/captures/docker-compose-ps-prod.png)
