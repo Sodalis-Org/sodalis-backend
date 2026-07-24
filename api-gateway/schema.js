@@ -20,6 +20,13 @@ const typeDefs = `#graphql
     createdAt: String!
   }
 
+  type Thank {
+    id: ID!
+    from_id: ID!
+    to_id: ID!
+    createdAt: String!
+  }
+
   type AuthPayload {
     user: User!
   }
@@ -140,6 +147,8 @@ const typeDefs = `#graphql
     complaints(colocId: ID!): [Complaint]
     polls(colocId: ID!): [Poll]
     myRecentThanks(colocId: ID!): [RecentThank]
+    colocThanks(colocId: ID!): [Thank]
+    unreadNotificationsCount(colocId: ID!): Int
   }
 
   type Mutation {
@@ -170,6 +179,7 @@ const typeDefs = `#graphql
     votePoll(poll_id: ID!, option_id: ID!): Poll
     closePoll(id: ID!): Poll
     thankUser(target_id: ID!): KarmaProfile
+    markNotificationsRead(colocId: ID!): Boolean
   }
 `;
 
