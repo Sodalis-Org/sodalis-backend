@@ -22,6 +22,12 @@ module.exports = [
                 fetch: 'readonly',
             },
         },
+        // Match root package.json engines so eslint-plugin-n allows Error cause.
+        settings: {
+            node: {
+                version: '>=22',
+            },
+        },
         rules: {
             'n/no-process-exit': 'off',
             'no-unused-vars': ['error', { argsIgnorePattern: '^_' }],

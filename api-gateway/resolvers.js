@@ -512,7 +512,7 @@ const resolvers = {
                 return data;
             } catch (err) {
                 const msg = err.response?.data?.error ?? err.message;
-                throw new Error(msg);
+                throw new Error(msg, { cause: err });
             }
         },
     },
