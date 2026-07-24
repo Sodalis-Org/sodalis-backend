@@ -314,7 +314,7 @@ Retourné par la query `notifications`.
 }
 ```
 
-> Un utilisateur ne peut voter que pour **une seule option** à la fois. Revoter retire l'ancien vote et enregistre le nouveau. `voters` contient les UUIDs — la taille de chaque tableau `voters` est le nombre de votes de l'option.
+> Un utilisateur ne peut voter que pour **une seule option** à la fois. Revoter retire l'ancien vote et enregistre le nouveau, sans réattribuer le karma. `voters` contient les UUIDs — la taille de chaque tableau `voters` est le nombre de votes de l'option.
 
 ### KarmaProfile
 
@@ -375,7 +375,10 @@ La propriété utile est `errors[0].message`. Exemples de messages :
 | `"Tâche introuvable"` | Task id inexistant (404) |
 | `"Sondage introuvable"` | Poll id inexistant (404) |
 | `"Ce sondage est fermé"` | Vote sur un poll CLOSED (400) |
+| `"Ce sondage est déjà fermé"` | closePoll sur un poll déjà CLOSED (400) |
+| `"Seul le créateur ou un ADMIN peut fermer ce sondage"` | closePoll sans droits (403) |
 | `"Vous ne pouvez pas vous remercier vous-même"` | thankUser(target_id = propre id) (400) |
+| `"Vous avez déjà remercié cette personne récemment"` | thankUser pendant le cooldown 24h (429) |
 | `"L'utilisateur assigné n'appartient pas à cette colocation"` | assignTicket avec UUID hors coloc (400) |
 
 ### Erreur de validation
@@ -1038,7 +1041,7 @@ mutation {
 
 ### `votePoll`
 
-Vote pour une option. Remplace le vote précédent si l'utilisateur avait déjà voté. Donne **+2 karma** au votant.
+Vote pour une option. Remplace le vote précédent si l'utilisateur avait déjà voté. Donne **+2 karma** au votant **uniquement au premier vote** ; un revote déplace le vote sans nouveau karma.
 
 ```graphql
 mutation {
@@ -1076,6 +1079,28 @@ mutation {
 
 ---
 
+### `closePoll`
+
+Ferme un sondage ouvert. Réservé au **créateur** ou à un **ADMIN**. Les votes deviennent impossibles. Pas de karma à la fermeture ; pas de réouverture.
+
+```graphql
+mutation {
+  closePoll(id: "507f191e810c19729de860ea") {
+    id
+    status
+  }
+}
+```
+
+**Réponse :** le `Poll` avec `status: "CLOSED"`.
+
+**Erreurs possibles :**
+- `"Sondage introuvable"` (404)
+- `"Seul le créateur ou un ADMIN peut fermer ce sondage"` (403)
+- `"Ce sondage est déjà fermé"` (400)
+
+---
+
 ### `polls`
 
 ```graphql
@@ -1103,7 +1128,7 @@ query {
 
 ### `thankUser`
 
-Donne **+3 karma** au colocataire ciblé. Impossible de se remercier soi-même.
+Donne **+3 karma** au colocataire ciblé. Impossible de se remercier soi-même. **Cooldown 24 h** par paire (émetteur → cible) dans la même coloc : un second remerciement trop tôt est refusé.
 
 ```graphql
 mutation {
@@ -1130,6 +1155,20 @@ mutation {
 
 **Erreurs possibles :**
 - `"Vous ne pouvez pas vous remercier vous-même"` (400)
+- `"Vous avez déjà remercié cette personne récemment"` (429) — corps REST Concordia : `{ "error": "...", "retry_after_seconds": N }`
+
+### `myRecentThanks`
+
+Liste les remerciements émis par l'utilisateur courant dans les **24 dernières heures** (pour afficher le cooldown côté UI).
+
+```graphql
+query {
+  myRecentThanks(colocId: "b2c3d4e5-...") {
+    to_id
+    createdAt
+  }
+}
+```
 
 ---
 
@@ -1468,7 +1507,15 @@ Quand `is_anonymous: true` : `creator_id` est `null` **dans toutes les réponses
 
 ### Vote de sondage
 
-Un utilisateur ne peut voter que pour **une seule option à la fois**. Revoter déplace simplement le vote. Pour savoir si l'utilisateur courant a déjà voté, chercher son UUID dans les tableaux `voters` de chaque option.
+Un utilisateur ne peut voter que pour **une seule option à la fois**. Revoter déplace simplement le vote, sans réattribuer le **+2 karma** (attribué une seule fois au premier vote). Pour savoir si l'utilisateur courant a déjà voté, chercher son UUID dans les tableaux `voters` de chaque option.
+
+### Fermeture de sondage
+
+Seul le **créateur** du sondage ou un **ADMIN** peut le fermer (`closePoll`). Un sondage fermé n'accepte plus de votes et ne peut pas être rouvert.
+
+### Remerciements karma
+
+Un utilisateur peut remercier une même cible au plus **une fois toutes les 24 heures** (fenêtre glissante). Utiliser `myRecentThanks` pour pré-désactiver le bouton côté client ; le serveur reste la source de vérité (429).
 
 ### Escalade automatique URGENT
 

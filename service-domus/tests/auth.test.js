@@ -77,6 +77,39 @@ describe('auth routes', () => {
         expect(res.status).toBe(409);
     });
 
+    it('GET /auth/me renvoie le profil Postgres', async () => {
+        const jwt = require('jsonwebtoken');
+        const token = jwt.sign(
+            { id: 'u1', email: 'a@test.com', role: 'MEMBER', coloc_id: null },
+            process.env.JWT_SECRET,
+        );
+        mockPool.query.mockResolvedValueOnce({
+            rows: [
+                {
+                    id: 'u1',
+                    name: 'Alice',
+                    email: 'a@test.com',
+                    role: 'MEMBER',
+                    coloc_id: 'c1',
+                    harmony_score: 3,
+                },
+            ],
+        });
+
+        const res = await request(app)
+            .get('/auth/me')
+            .set('Authorization', `Bearer ${token}`);
+
+        expect(res.status).toBe(200);
+        expect(res.body.coloc_id).toBe('c1');
+        expect(res.body.harmony_score).toBe(3);
+    });
+
+    it('GET /auth/me renvoie 401 sans token', async () => {
+        const res = await request(app).get('/auth/me');
+        expect(res.status).toBe(401);
+    });
+
     it('POST /auth/login renvoie un token pour des identifiants valides', async () => {
         const bcrypt = require('bcrypt');
         const hashed = await bcrypt.hash('password123', 10);

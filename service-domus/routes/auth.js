@@ -6,6 +6,7 @@ const rateLimit = require('express-rate-limit');
 const { body } = require('express-validator');
 const pool = require('../db');
 const validate = require('../middleware/validate');
+const auth = require('../middleware/auth');
 const logger = require('../logger');
 
 if (!process.env.JWT_SECRET) throw new Error('[FATAL] JWT_SECRET non défini — démarrage refusé');
@@ -23,6 +24,20 @@ const authLimiter = rateLimit({
         logger.warn({ ip: req.ip }, 'Rate limit dépassé sur /auth');
         res.status(options.statusCode).json(options.message);
     },
+});
+
+// GET /auth/me — Profil courant depuis Postgres (source de vérité coloc_id / role)
+router.get('/me', auth, async (req, res) => {
+    const { rows } = await pool.query(
+        'SELECT id, name, email, role, coloc_id, harmony_score FROM users WHERE id = $1',
+        [req.user.id],
+    );
+
+    if (rows.length === 0) {
+        return res.status(404).json({ error: 'Utilisateur introuvable' });
+    }
+
+    res.json(rows[0]);
 });
 
 // POST /auth/register — Inscription

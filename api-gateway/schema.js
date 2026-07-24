@@ -15,6 +15,11 @@ const typeDefs = `#graphql
     score: Int!
   }
 
+  type RecentThank {
+    to_id: ID!
+    createdAt: String!
+  }
+
   type AuthPayload {
     user: User!
   }
@@ -48,11 +53,23 @@ const typeDefs = `#graphql
   type Coloc {
     id: ID!
     name: String!
-    invite_code: String!
+    invite_code: String
   }
 
   type ColocResult {
     coloc: Coloc!
+  }
+
+  type LeaveColocResult {
+    ok: Boolean!
+  }
+
+  type KickMemberResult {
+    ok: Boolean!
+  }
+
+  type TransferAdminResult {
+    ok: Boolean!
   }
 
   type Task {
@@ -122,6 +139,7 @@ const typeDefs = `#graphql
     notifications(colocId: ID!, page: Int, limit: Int): NotificationsResult
     complaints(colocId: ID!): [Complaint]
     polls(colocId: ID!): [Poll]
+    myRecentThanks(colocId: ID!): [RecentThank]
   }
 
   type Mutation {
@@ -130,6 +148,10 @@ const typeDefs = `#graphql
     logout: Boolean
     createColoc(name: String!): ColocResult
     joinColoc(invite_code: String!): ColocResult
+    leaveColoc: LeaveColocResult
+    regenerateInviteCode: ColocResult
+    kickMember(userId: ID!): KickMemberResult
+    transferAdmin(userId: ID!): TransferAdminResult
     createTask(title: String!, assignee_id: ID!, coloc_id: ID!, due_at: String): Task
     updateTaskStatus(id: ID!, status: String!): Task
     createMaintenanceTicket(
@@ -146,6 +168,7 @@ const typeDefs = `#graphql
     deleteComplaint(id: ID!): Boolean
     createPoll(coloc_id: ID!, question: String!, options: [String!]!): Poll
     votePoll(poll_id: ID!, option_id: ID!): Poll
+    closePoll(id: ID!): Poll
     thankUser(target_id: ID!): KarmaProfile
   }
 `;
