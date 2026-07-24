@@ -1,3 +1,4 @@
+const { randomUUID } = require('crypto');
 const axios = require('axios');
 const jwt = require('jsonwebtoken');
 const logger = require('./logger');
@@ -22,18 +23,76 @@ function forwardHeaders(req) {
 const resolvers = {
     Query: {
         // Rehydrate le contexte d'authentification côté client : le jeton vit dans un
-        // cookie httpOnly (illisible en JS), seule une requête au serveur permet de
-        // savoir qui est connecté après un rechargement de page.
-        me: (_, __, { user }) => user || null,
+        // cookie httpOnly (illisible en JS). On lit Postgres via Domus pour éviter un
+        // coloc_id stale dans le JWT après createColoc / leave.
+        me: async (_, __, { user, req, res }) => {
+            if (!user) return null;
+            try {
+                const { data } = await axios.get(`${DOMUS_URL}/auth/me`, {
+                    headers: forwardHeaders(req),
+                });
+                const dbUser = {
+                    id: data.id,
+                    name: data.name,
+                    email: data.email,
+                    role: data.role,
+                    coloc_id: data.coloc_id ?? null,
+                    harmony_score: data.harmony_score ?? 0,
+                };
+                const jwtColoc = user.coloc_id ?? null;
+                const dbColoc = dbUser.coloc_id ?? null;
+                if (String(jwtColoc) !== String(dbColoc) || user.role !== dbUser.role) {
+                    const token = jwt.sign(
+                        {
+                            id: dbUser.id,
+                            email: dbUser.email,
+                            name: dbUser.name,
+                            coloc_id: dbUser.coloc_id,
+                            role: dbUser.role,
+                            jti: randomUUID(),
+                        },
+                        JWT_SECRET,
+                        { expiresIn: '24h', algorithm: 'HS256' },
+                    );
+                    res.cookie(AUTH_COOKIE_NAME, token, AUTH_COOKIE_OPTIONS);
+                    // Aligne le contexte de cette requête pour les resolvers suivants.
+                    user.coloc_id = dbUser.coloc_id;
+                    user.role = dbUser.role;
+                    req.headers.authorization = `Bearer ${token}`;
+                }
+                return dbUser;
+            } catch (err) {
+                logger.warn({ err: err.message, userId: user.id }, 'me: fallback JWT (Domus injoignable)');
+                return user;
+            }
+        },
 
         myColoc: async (_, __, { user, req }) => {
-            if (!user || !user.coloc_id) {
+            if (!user) {
                 throw new Error('Non autorisé — Aucune colocation associée');
             }
-            const colocId = user.coloc_id;
+            let colocId = user.coloc_id;
+            let role = user.role;
+            if (!colocId) {
+                try {
+                    const { data } = await axios.get(`${DOMUS_URL}/auth/me`, {
+                        headers: forwardHeaders(req),
+                    });
+                    colocId = data.coloc_id;
+                    role = data.role;
+                } catch {
+                    throw new Error('Non autorisé — Aucune colocation associée');
+                }
+            }
+            if (!colocId) {
+                throw new Error('Non autorisé — Aucune colocation associée');
+            }
             const { data } = await axios.get(`${DOMUS_URL}/colocs/${colocId}`, {
                 headers: forwardHeaders(req),
             });
+            if (role !== 'ADMIN') {
+                return { ...data, invite_code: null };
+            }
             return data;
         },
 
@@ -132,6 +191,21 @@ const resolvers = {
             const { data } = await axios.get(`${CONCORDIA_URL}/api/polls?coloc_id=${colocId}`, {
                 headers: forwardHeaders(req),
             });
+            return data;
+        },
+
+        myRecentThanks: async (_, { colocId }, { user, req }) => {
+            if (!user || (user.role !== 'ADMIN' && user.coloc_id !== colocId)) {
+                logger.warn(
+                    { userId: user?.id },
+                    "Accès refusé — appartenance à une autre colocation",
+                );
+                throw new Error("Non autorisé — Vous n'appartenez pas à cette colocation");
+            }
+            const { data } = await axios.get(
+                `${CONCORDIA_URL}/api/karma/thanks?coloc_id=${colocId}`,
+                { headers: forwardHeaders(req) },
+            );
             return data;
         },
 
@@ -238,6 +312,54 @@ const resolvers = {
             );
             res.cookie(AUTH_COOKIE_NAME, data.token, AUTH_COOKIE_OPTIONS);
             return { coloc: data.coloc };
+        },
+
+        leaveColoc: async (_, __, { user, req, res }) => {
+            if (!user) throw new Error('Non autorisé');
+            const { data } = await axios.post(
+                `${DOMUS_URL}/colocs/leave`,
+                {},
+                { headers: forwardHeaders(req) },
+            );
+            res.cookie(AUTH_COOKIE_NAME, data.token, AUTH_COOKIE_OPTIONS);
+            return { ok: true };
+        },
+
+        regenerateInviteCode: async (_, __, { user, req }) => {
+            if (!user || user.role !== 'ADMIN') {
+                throw new Error('Non autorisé — Réservé aux ADMINs');
+            }
+            const { data } = await axios.post(
+                `${DOMUS_URL}/colocs/regenerate-invite`,
+                {},
+                { headers: forwardHeaders(req) },
+            );
+            return { coloc: data.coloc };
+        },
+
+        kickMember: async (_, { userId }, { user, req }) => {
+            if (!user || user.role !== 'ADMIN') {
+                throw new Error('Non autorisé — Réservé aux ADMINs');
+            }
+            await axios.post(
+                `${DOMUS_URL}/colocs/members/${userId}/kick`,
+                {},
+                { headers: forwardHeaders(req) },
+            );
+            return { ok: true };
+        },
+
+        transferAdmin: async (_, { userId }, { user, req, res }) => {
+            if (!user || user.role !== 'ADMIN') {
+                throw new Error('Non autorisé — Réservé aux ADMINs');
+            }
+            const { data } = await axios.post(
+                `${DOMUS_URL}/colocs/transfer-admin`,
+                { userId },
+                { headers: forwardHeaders(req) },
+            );
+            res.cookie(AUTH_COOKIE_NAME, data.token, AUTH_COOKIE_OPTIONS);
+            return { ok: true };
         },
 
         createTask: async (_, { title, assignee_id, coloc_id, due_at }, { user, req }) => {
@@ -367,15 +489,31 @@ const resolvers = {
             return data;
         },
 
-        thankUser: async (_, { target_id }, { user, req }) => {
+        closePoll: async (_, { id }, { user, req }) => {
             if (!user) throw new Error('Non autorisé');
-            const { data } = await axios.post(
-                `${CONCORDIA_URL}/api/karma/${target_id}/thank`,
+            const { data } = await axios.patch(
+                `${CONCORDIA_URL}/api/polls/${id}/close`,
                 {},
                 { headers: forwardHeaders(req) },
             );
-            await cache.del(`dashboard_coloc_${user.coloc_id}`);
+            await cache.del(`dashboard_coloc_${data.coloc_id}`);
             return data;
+        },
+
+        thankUser: async (_, { target_id }, { user, req }) => {
+            if (!user) throw new Error('Non autorisé');
+            try {
+                const { data } = await axios.post(
+                    `${CONCORDIA_URL}/api/karma/${target_id}/thank`,
+                    {},
+                    { headers: forwardHeaders(req) },
+                );
+                await cache.del(`dashboard_coloc_${user.coloc_id}`);
+                return data;
+            } catch (err) {
+                const msg = err.response?.data?.error ?? err.message;
+                throw new Error(msg);
+            }
         },
     },
 };

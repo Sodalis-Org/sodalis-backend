@@ -18,19 +18,59 @@ function mockRes() {
 describe('resolvers.Query', () => {
     beforeEach(() => vi.clearAllMocks());
 
-    it('me renvoie null sans utilisateur authentifié', () => {
-        expect(resolvers.Query.me(null, {}, { user: null })).toBeNull();
+    it('me renvoie null sans utilisateur authentifié', async () => {
+        expect(await resolvers.Query.me(null, {}, { user: null })).toBeNull();
     });
 
-    it('me renvoie les claims du jeton décodé', () => {
-        const user = { id: 'u1', name: 'Alice', email: 'a@test.com', role: 'ADMIN' };
-        expect(resolvers.Query.me(null, {}, { user })).toBe(user);
+    it('me hydrate depuis Domus et rafraîchit le cookie si coloc_id diverge', async () => {
+        mockAxios.get.mockResolvedValueOnce({
+            data: {
+                id: 'u1',
+                name: 'Alice',
+                email: 'a@test.com',
+                role: 'ADMIN',
+                coloc_id: COLOC_ID,
+                harmony_score: 0,
+            },
+        });
+        const res = mockRes();
+        const jwtUser = { id: 'u1', name: 'Alice', email: 'a@test.com', role: 'MEMBER', coloc_id: null };
+        const result = await resolvers.Query.me(null, {}, { user: jwtUser, req, res });
+        expect(result.coloc_id).toBe(COLOC_ID);
+        expect(result.role).toBe('ADMIN');
+        expect(res.cookie).toHaveBeenCalledWith('sodalis_token', expect.any(String), expect.any(Object));
+        expect(jwtUser.coloc_id).toBe(COLOC_ID);
+    });
+
+    it('me retombe sur le JWT si Domus est injoignable', async () => {
+        mockAxios.get.mockRejectedValueOnce(new Error('down'));
+        const user = { id: 'u1', name: 'Alice', email: 'a@test.com', role: 'ADMIN', coloc_id: null };
+        const result = await resolvers.Query.me(null, {}, { user, req, res: mockRes() });
+        expect(result).toBe(user);
     });
 
     it('myColoc lève une erreur sans coloc_id', async () => {
+        mockAxios.get.mockRejectedValueOnce(new Error('no'));
         await expect(
             resolvers.Query.myColoc(null, {}, { user: { coloc_id: null }, req }),
         ).rejects.toThrow('Non autorisé');
+    });
+
+    it('myColoc hydrate coloc_id via /auth/me si absent du JWT', async () => {
+        mockAxios.get
+            .mockResolvedValueOnce({
+                data: { id: 'u1', coloc_id: COLOC_ID, role: 'ADMIN' },
+            })
+            .mockResolvedValueOnce({
+                data: { id: COLOC_ID, name: 'Chez nous', invite_code: 'abc' },
+            });
+        const result = await resolvers.Query.myColoc(
+            null,
+            {},
+            { user: { id: 'u1', coloc_id: null, role: 'MEMBER' }, req },
+        );
+        expect(result.id).toBe(COLOC_ID);
+        expect(result.invite_code).toBe('abc');
     });
 
     it("myColoc récupère la coloc de l'utilisateur", async () => {
@@ -229,6 +269,74 @@ describe('resolvers.Mutation', () => {
         expect(res.cookie).toHaveBeenCalledWith('sodalis_token', 'new-tok', expect.any(Object));
     });
 
+    it('leaveColoc repose le cookie sans coloc', async () => {
+        mockAxios.post.mockResolvedValueOnce({ data: { token: 'left-tok' } });
+        const res = mockRes();
+        const result = await resolvers.Mutation.leaveColoc(
+            null,
+            {},
+            { user: { id: 'u1', coloc_id: COLOC_ID }, req, res },
+        );
+        expect(result.ok).toBe(true);
+        expect(res.cookie).toHaveBeenCalledWith('sodalis_token', 'left-tok', expect.any(Object));
+    });
+
+    it('regenerateInviteCode refuse un MEMBER', async () => {
+        await expect(
+            resolvers.Mutation.regenerateInviteCode(
+                null,
+                {},
+                { user: { id: 'u1', role: 'MEMBER', coloc_id: COLOC_ID }, req },
+            ),
+        ).rejects.toThrow(/ADMIN/);
+    });
+
+    it('regenerateInviteCode délègue pour un ADMIN', async () => {
+        mockAxios.post.mockResolvedValueOnce({
+            data: { coloc: { id: COLOC_ID, invite_code: 'new-code' } },
+        });
+        const result = await resolvers.Mutation.regenerateInviteCode(
+            null,
+            {},
+            { user: { id: 'u1', role: 'ADMIN', coloc_id: COLOC_ID }, req },
+        );
+        expect(result.coloc.invite_code).toBe('new-code');
+    });
+
+    it('kickMember délègue pour un ADMIN', async () => {
+        mockAxios.post.mockResolvedValueOnce({ data: { ok: true } });
+        const result = await resolvers.Mutation.kickMember(
+            null,
+            { userId: 'u2' },
+            { user: { id: 'u1', role: 'ADMIN', coloc_id: COLOC_ID }, req },
+        );
+        expect(result.ok).toBe(true);
+    });
+
+    it('transferAdmin repose le cookie MEMBER', async () => {
+        mockAxios.post.mockResolvedValueOnce({ data: { token: 'member-tok' } });
+        const res = mockRes();
+        const result = await resolvers.Mutation.transferAdmin(
+            null,
+            { userId: 'u2' },
+            { user: { id: 'u1', role: 'ADMIN', coloc_id: COLOC_ID }, req, res },
+        );
+        expect(result.ok).toBe(true);
+        expect(res.cookie).toHaveBeenCalledWith('sodalis_token', 'member-tok', expect.any(Object));
+    });
+
+    it('myColoc masque invite_code pour un MEMBER', async () => {
+        mockAxios.get.mockResolvedValueOnce({
+            data: { id: COLOC_ID, name: 'Chez nous', invite_code: null },
+        });
+        const result = await resolvers.Query.myColoc(
+            null,
+            {},
+            { user: { coloc_id: COLOC_ID, role: 'MEMBER' }, req },
+        );
+        expect(result.invite_code).toBeNull();
+    });
+
     it('logout révoque le jeton courant et efface le cookie', async () => {
         const jwt = require('jsonwebtoken');
         process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-secret';
@@ -343,6 +451,12 @@ describe('resolvers.Mutation', () => {
             { poll_id: 'p1', option_id: 'opt-1' },
             { user: { id: 'u1' }, req },
         );
+        expect(mockCache.del).toHaveBeenCalledWith(`dashboard_coloc_${COLOC_ID}`);
+    });
+
+    it('closePoll invalide le cache dashboard', async () => {
+        mockAxios.patch.mockResolvedValueOnce({ data: { id: 'p1', coloc_id: COLOC_ID, status: 'CLOSED' } });
+        await resolvers.Mutation.closePoll(null, { id: 'p1' }, { user: { id: 'u1' }, req });
         expect(mockCache.del).toHaveBeenCalledWith(`dashboard_coloc_${COLOC_ID}`);
     });
 });

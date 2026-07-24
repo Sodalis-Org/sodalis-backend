@@ -8,6 +8,8 @@ const publisher = require('../redis-publisher');
 
 function sanitize(complaint) {
     const obj = complaint.toObject ? complaint.toObject() : { ...complaint };
+    obj.id = String(obj._id);
+    delete obj._id;
     if (obj.is_anonymous) obj.creator_id = null;
     return obj;
 }
@@ -30,6 +32,10 @@ function checkColoc(user, coloc_id) {
 
 function canActOnComplaint(user, complaint) {
     return user.role === 'ADMIN' || String(user.id) === String(complaint.creator_id);
+}
+
+function canActOnPoll(user, poll) {
+    return user.role === 'ADMIN' || String(user.id) === String(poll.creator_id);
 }
 
 const router = Router();
@@ -231,6 +237,7 @@ router.post('/polls/:id/vote', async (req, res, next) => {
         }
 
         const userId = String(req.user.id);
+        const alreadyVoted = poll.options.some((opt) => opt.voters.includes(userId));
 
         for (const opt of poll.options) {
             const idx = opt.voters.indexOf(userId);
@@ -243,7 +250,9 @@ router.post('/polls/:id/vote', async (req, res, next) => {
         target.voters.push(userId);
         await poll.save();
 
-        await incrementKarma(req.user.id, poll.coloc_id, 2);
+        if (!alreadyVoted) {
+            await incrementKarma(req.user.id, poll.coloc_id, 2);
+        }
 
         await publisher.publish(
             'sodalis_events',
@@ -257,6 +266,44 @@ router.post('/polls/:id/vote', async (req, res, next) => {
         );
 
         logger.info({ poll_id: poll._id, option_id, user_id: userId }, 'Vote enregistré');
+        res.json(toPollObject(poll));
+    } catch (err) {
+        next(err);
+    }
+});
+
+router.patch('/polls/:id/close', async (req, res, next) => {
+    try {
+        const poll = await Poll.findById(req.params.id);
+        if (!poll) return res.status(404).json({ error: 'Sondage introuvable' });
+
+        checkColoc(req.user, poll.coloc_id);
+
+        if (!canActOnPoll(req.user, poll)) {
+            return res
+                .status(403)
+                .json({ error: 'Seul le créateur ou un ADMIN peut fermer ce sondage' });
+        }
+
+        if (poll.status === 'CLOSED') {
+            return res.status(400).json({ error: 'Ce sondage est déjà fermé' });
+        }
+
+        poll.status = 'CLOSED';
+        await poll.save();
+
+        await publisher.publish(
+            'sodalis_events',
+            JSON.stringify({
+                type: 'POLL_UPDATED',
+                coloc_id: String(poll.coloc_id),
+                poll_id: String(poll._id),
+                question: poll.question,
+                message: `Le sondage a été fermé : ${poll.question}`,
+            }),
+        );
+
+        logger.info({ poll_id: poll._id }, 'Sondage fermé');
         res.json(toPollObject(poll));
     } catch (err) {
         next(err);

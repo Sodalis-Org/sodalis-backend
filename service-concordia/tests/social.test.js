@@ -60,6 +60,11 @@ describe('social routes — complaints', () => {
             .send({ coloc_id: COLOC_ID, message: 'Trop de bruit' });
 
         expect(res.status).toBe(201);
+        expect(res.body).toMatchObject({
+            id: 'c1',
+            message: 'Trop de bruit',
+        });
+        expect(res.body._id).toBeUndefined();
         expect(mockPublisher.publish).toHaveBeenCalled();
     });
 
@@ -231,6 +236,99 @@ describe('social routes — polls', () => {
 
         expect(res.status).toBe(200);
         expect(res.body.options[0].voters).toContain('user-1');
+        expect(mockKarmaProfile.findOneAndUpdate).toHaveBeenCalled();
+    });
+
+    it('POST /api/polls/:id/vote ne réattribue pas de karma au revote', async () => {
+        const options = [
+            { option_id: 'opt-1', text: 'Pizza', voters: ['user-1'] },
+            { option_id: 'opt-2', text: 'Sushi', voters: [] },
+        ];
+        mockPoll.findById.mockResolvedValueOnce({
+            _id: 'p1',
+            coloc_id: COLOC_ID,
+            question: 'Pizza ou sushi ?',
+            status: 'OPEN',
+            options,
+            save: vi.fn(function save() {
+                return Promise.resolve(this);
+            }),
+            toObject() {
+                return { _id: this._id, question: this.question, options: this.options };
+            },
+        });
+
+        const res = await request(app)
+            .post('/api/polls/p1/vote')
+            .set('Authorization', `Bearer ${tokenFor()}`)
+            .send({ option_id: 'opt-2' });
+
+        expect(res.status).toBe(200);
+        expect(res.body.options[0].voters).not.toContain('user-1');
+        expect(res.body.options[1].voters).toContain('user-1');
+        expect(mockKarmaProfile.findOneAndUpdate).not.toHaveBeenCalled();
+    });
+
+    it('PATCH /api/polls/:id/close ferme un sondage (créateur)', async () => {
+        mockPoll.findById.mockResolvedValueOnce({
+            _id: 'p1',
+            coloc_id: COLOC_ID,
+            creator_id: 'user-1',
+            question: 'Pizza ou sushi ?',
+            status: 'OPEN',
+            save: vi.fn(function save() {
+                return Promise.resolve(this);
+            }),
+            toObject() {
+                return {
+                    _id: this._id,
+                    coloc_id: this.coloc_id,
+                    creator_id: this.creator_id,
+                    question: this.question,
+                    status: this.status,
+                    options: [],
+                };
+            },
+        });
+
+        const res = await request(app)
+            .patch('/api/polls/p1/close')
+            .set('Authorization', `Bearer ${tokenFor()}`);
+
+        expect(res.status).toBe(200);
+        expect(res.body.status).toBe('CLOSED');
+    });
+
+    it('PATCH /api/polls/:id/close renvoie 403 si ni créateur ni ADMIN', async () => {
+        mockPoll.findById.mockResolvedValueOnce({
+            _id: 'p1',
+            coloc_id: COLOC_ID,
+            creator_id: 'other-user',
+            question: 'Pizza ou sushi ?',
+            status: 'OPEN',
+        });
+
+        const res = await request(app)
+            .patch('/api/polls/p1/close')
+            .set('Authorization', `Bearer ${tokenFor()}`);
+
+        expect(res.status).toBe(403);
+    });
+
+    it('PATCH /api/polls/:id/close renvoie 400 si déjà fermé', async () => {
+        mockPoll.findById.mockResolvedValueOnce({
+            _id: 'p1',
+            coloc_id: COLOC_ID,
+            creator_id: 'user-1',
+            question: 'Pizza ou sushi ?',
+            status: 'CLOSED',
+        });
+
+        const res = await request(app)
+            .patch('/api/polls/p1/close')
+            .set('Authorization', `Bearer ${tokenFor()}`);
+
+        expect(res.status).toBe(400);
     });
 
     it('GET /api/polls liste les sondages de la coloc', async () => {

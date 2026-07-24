@@ -119,10 +119,15 @@ async function createApp() {
                           frameAncestors: ["'none'"],
                       },
                   },
+                  // Front Vite (:5173) et API (:4000) sont cross-origin en local / split hosting.
+                  crossOriginResourcePolicy: { policy: 'cross-origin' },
               })
             : // Le Sandbox Apollo (landing page GraphQL en dev) charge un iframe
               // et des scripts depuis apollographql.com — CSP désactivée en dev uniquement.
-              helmet({ contentSecurityPolicy: false }),
+              helmet({
+                  contentSecurityPolicy: false,
+                  crossOriginResourcePolicy: { policy: 'cross-origin' },
+              }),
     );
 
     // Identifiant de corrélation propagé du client jusqu'aux services en aval (via
