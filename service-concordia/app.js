@@ -35,20 +35,24 @@ function corsOriginValidator(origin, cb) {
     return cb(new Error(`CORS refusé pour l'origine: ${origin}`));
 }
 
-const apiLimiter = rateLimit({
-    windowMs: 60 * 1000,
-    max: 100,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: { error: 'Trop de requêtes — réessayez dans une minute' },
-    skip: (req) => req.path === '/health',
-    handler: (req, res, _next, options) => {
-        logger.warn({ ip: req.ip }, 'Rate limit dépassé sur service-concordia');
-        res.status(options.statusCode).json(options.message);
-    },
-});
-
 function createApp() {
+    // Instancié à chaque appel (et non au niveau du module) pour que chaque app créée par les
+    // tests ait son propre compteur en mémoire : un `apiLimiter` partagé au niveau module ferait
+    // fuiter l'état entre fichiers de test exécutés dans le même worker Vitest. En production,
+    // `createApp()` n'est appelé qu'une fois (index.js), donc ce changement est neutre.
+    const apiLimiter = rateLimit({
+        windowMs: 60 * 1000,
+        max: 100,
+        standardHeaders: true,
+        legacyHeaders: false,
+        message: { error: 'Trop de requêtes — réessayez dans une minute' },
+        skip: (req) => req.path === '/health',
+        handler: (req, res, _next, options) => {
+            logger.warn({ ip: req.ip }, 'Rate limit dépassé sur service-concordia');
+            res.status(options.statusCode).json(options.message);
+        },
+    });
+
     const app = express();
     app.use(helmet());
     app.use(

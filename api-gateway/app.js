@@ -78,20 +78,24 @@ const complexityPlugin = {
     },
 };
 
-const graphqlLimiter = rateLimit({
-    windowMs: 60 * 1000,
-    max: 100,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: { error: 'Trop de requêtes — réessayez dans une minute' },
-    handler: (req, res, _next, options) => {
-        logger.warn({ ip: req.ip }, 'Rate limit dépassé sur /graphql');
-        res.status(options.statusCode).json(options.message);
-    },
-});
-
 async function createApp() {
     const app = express();
+
+    // Instancié à chaque appel (et non au niveau du module) pour que chaque app créée par les
+    // tests ait son propre compteur en mémoire : un `graphqlLimiter` partagé au niveau module
+    // ferait fuiter l'état entre fichiers de test exécutés dans le même worker Vitest. En
+    // production, `createApp()` n'est appelé qu'une fois, donc ce changement est neutre.
+    const graphqlLimiter = rateLimit({
+        windowMs: 60 * 1000,
+        max: 100,
+        standardHeaders: true,
+        legacyHeaders: false,
+        message: { error: 'Trop de requêtes — réessayez dans une minute' },
+        handler: (req, res, _next, options) => {
+            logger.warn({ ip: req.ip }, 'Rate limit dépassé sur /graphql');
+            res.status(options.statusCode).json(options.message);
+        },
+    });
 
     const apolloServer = new ApolloServer({
         typeDefs,
