@@ -36,6 +36,10 @@ router.post(
         const created_by = req.user.id;
 
         if (req.user.coloc_id !== coloc_id) {
+            logger.warn(
+                { userId: req.user.id },
+                'Accès refusé — création de ticket hors de sa colocation',
+            );
             return res
                 .status(403)
                 .json({ error: "Non autorisé — Vous n'appartenez pas à cette colocation" });
@@ -102,6 +106,10 @@ router.get(
         const { coloc_id } = req.query;
 
         if (req.user.coloc_id !== coloc_id) {
+            logger.warn(
+                { userId: req.user.id },
+                'Accès refusé — liste des tickets hors de sa colocation',
+            );
             return res
                 .status(403)
                 .json({ error: "Non autorisé — Vous n'appartenez pas à cette colocation" });
@@ -146,6 +154,10 @@ router.patch(
             const ticket = rows[0];
 
             if (req.user.coloc_id !== ticket.coloc_id) {
+                logger.warn(
+                    { userId: req.user.id },
+                    'Accès refusé — mise à jour de ticket hors de sa colocation',
+                );
                 return res
                     .status(403)
                     .json({ error: "Non autorisé — Vous n'appartenez pas à cette colocation" });
@@ -191,6 +203,10 @@ router.patch(
     validate,
     async (req, res, next) => {
         if (req.user.role !== 'ADMIN') {
+            logger.warn(
+                { userId: req.user.id },
+                'Accès refusé — assignation de ticket réservée aux ADMINs',
+            );
             return res.status(403).json({ error: 'Non autorisé — Réservé aux ADMINs' });
         }
 
@@ -210,6 +226,10 @@ router.patch(
             const ticket = rows[0];
 
             if (req.user.coloc_id !== ticket.coloc_id) {
+                logger.warn(
+                    { userId: req.user.id },
+                    'Accès refusé — assignation de ticket hors de sa colocation',
+                );
                 return res
                     .status(403)
                     .json({

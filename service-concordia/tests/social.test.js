@@ -6,7 +6,7 @@ const mockComplaint = { create: vi.fn(), findById: vi.fn(), find: vi.fn() };
 const mockPoll = { create: vi.fn(), findById: vi.fn(), find: vi.fn() };
 const mockKarmaProfile = { find: vi.fn(), findOneAndUpdate: vi.fn() };
 const mockNotification = { find: vi.fn(), countDocuments: vi.fn(), create: vi.fn() };
-const mockPublisher = { publish: vi.fn(), del: vi.fn(), connect: vi.fn(), quit: vi.fn() };
+const mockPublisher = { publish: vi.fn(), del: vi.fn(), get: vi.fn(), connect: vi.fn(), quit: vi.fn() };
 mockRequire(require, '../models/Complaint', mockComplaint);
 mockRequire(require, '../models/Poll', mockPoll);
 mockRequire(require, '../models/KarmaProfile', mockKarmaProfile);
@@ -137,6 +137,24 @@ describe('social routes — complaints', () => {
 
         expect(res.status).toBe(200);
         expect(res.body).toHaveLength(1);
+    });
+
+    it('GET /api/complaints renvoie 400 pour un status invalide', async () => {
+        const res = await request(app)
+            .get('/api/complaints')
+            .query({ coloc_id: COLOC_ID, status: 'NOT_A_STATUS' })
+            .set('Authorization', `Bearer ${tokenFor()}`);
+
+        expect(res.status).toBe(400);
+    });
+
+    it('GET /api/complaints rejette un status répété (tableau) plutôt que de le transmettre au filtre Mongoose', async () => {
+        const res = await request(app)
+            .get(`/api/complaints?coloc_id=${COLOC_ID}&status=OPEN&status=RESOLVED`)
+            .set('Authorization', `Bearer ${tokenFor()}`);
+
+        expect(res.status).toBe(400);
+        expect(mockComplaint.find).not.toHaveBeenCalled();
     });
 });
 

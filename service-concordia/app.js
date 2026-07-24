@@ -2,6 +2,8 @@ require('dotenv').config();
 
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const pinoHttp = require('pino-http');
 const mongoose = require('mongoose');
 const logger = require('./logger');
@@ -34,7 +36,25 @@ function corsOriginValidator(origin, cb) {
 }
 
 function createApp() {
+    // Instancié à chaque appel (et non au niveau du module) pour que chaque app créée par les
+    // tests ait son propre compteur en mémoire : un `apiLimiter` partagé au niveau module ferait
+    // fuiter l'état entre fichiers de test exécutés dans le même worker Vitest. En production,
+    // `createApp()` n'est appelé qu'une fois (index.js), donc ce changement est neutre.
+    const apiLimiter = rateLimit({
+        windowMs: 60 * 1000,
+        max: 100,
+        standardHeaders: true,
+        legacyHeaders: false,
+        message: { error: 'Trop de requêtes — réessayez dans une minute' },
+        skip: (req) => req.path === '/health',
+        handler: (req, res, _next, options) => {
+            logger.warn({ ip: req.ip }, 'Rate limit dépassé sur service-concordia');
+            res.status(options.statusCode).json(options.message);
+        },
+    });
+
     const app = express();
+    app.use(helmet());
     app.use(
         cors({
             origin: corsOriginValidator,
@@ -42,8 +62,9 @@ function createApp() {
             optionsSuccessStatus: 204,
         }),
     );
-    app.use(pinoHttp({ logger }));
+    app.use(pinoHttp({ logger, genReqId: (req) => req.headers['x-request-id'] }));
     app.use(express.json());
+    app.use(apiLimiter);
 
     app.use('/api', auth, socialRoutes);
     app.use('/api', auth, karmaRoutes);

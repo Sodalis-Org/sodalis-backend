@@ -23,6 +23,12 @@ describe('api-gateway app', () => {
         expect(res.body.status).toBe('ok');
     });
 
+    it('applique les en-têtes de sécurité helmet par défaut', async () => {
+        const res = await request(app).get('/health');
+        expect(res.headers['x-content-type-options']).toBe('nosniff');
+        expect(res.headers['x-dns-prefetch-control']).toBe('off');
+    });
+
     it('POST /graphql exécute une requête authentifiée', async () => {
         mockCache.get.mockResolvedValueOnce(null);
         mockAxios.get
@@ -38,7 +44,7 @@ describe('api-gateway app', () => {
 
         const res = await request(app)
             .post('/graphql')
-            .set('Authorization', `Bearer ${token}`)
+            .set('Cookie', `sodalis_token=${token}`)
             .send({
                 query: 'query($id: ID!) { getColocDashboard(colocId: $id) { open_complaints } }',
                 variables: { id: 'coloc-1' },
@@ -51,7 +57,7 @@ describe('api-gateway app', () => {
     it('POST /graphql ignore un token invalide sans planter', async () => {
         const res = await request(app)
             .post('/graphql')
-            .set('Authorization', 'Bearer not-a-valid-token')
+            .set('Cookie', 'sodalis_token=not-a-valid-token')
             .send({ query: '{ __typename }' });
 
         expect(res.status).toBe(200);
@@ -61,12 +67,27 @@ describe('api-gateway app', () => {
     it('POST /graphql avec un token invalide rejette le résolveur sans appeler les services', async () => {
         const res = await request(app)
             .post('/graphql')
-            .set('Authorization', 'Bearer not-a-valid-token')
+            .set('Cookie', 'sodalis_token=not-a-valid-token')
             .send({ query: '{ myColoc { id } }' });
 
         expect(res.status).toBe(200);
         expect(res.body.errors).toBeDefined();
         expect(res.body.errors[0].message).toMatch(/Non autorisé/);
         expect(mockAxios.get).not.toHaveBeenCalled();
+    });
+
+    // Dernier test du fichier : le rate limiter /graphql est un singleton au niveau du
+    // module (compteur jamais réinitialisé entre tests). 105 requêtes dépassent la
+    // limite de 100, quel que soit le solde déjà consommé par les tests précédents.
+    it('POST /graphql renvoie 429 après dépassement du rate limit', async () => {
+        let lastStatus;
+        for (let i = 0; i < 105; i++) {
+            const res = await request(app)
+                .post('/graphql')
+                .send({ query: '{ __typename }' });
+            lastStatus = res.status;
+        }
+
+        expect(lastStatus).toBe(429);
     });
 });

@@ -6,12 +6,26 @@ mockRequire(require, 'axios', mockAxios);
 mockRequire(require, '../cache', mockCache);
 
 const resolvers = require('../resolvers');
+const logger = require('../logger');
 
-const req = { headers: { authorization: 'Bearer token123' } };
+const req = { headers: { authorization: 'Bearer token123' }, cookies: {} };
 const COLOC_ID = 'coloc-1';
+
+function mockRes() {
+    return { cookie: vi.fn(), clearCookie: vi.fn() };
+}
 
 describe('resolvers.Query', () => {
     beforeEach(() => vi.clearAllMocks());
+
+    it('me renvoie null sans utilisateur authentifié', () => {
+        expect(resolvers.Query.me(null, {}, { user: null })).toBeNull();
+    });
+
+    it('me renvoie les claims du jeton décodé', () => {
+        const user = { id: 'u1', name: 'Alice', email: 'a@test.com', role: 'ADMIN' };
+        expect(resolvers.Query.me(null, {}, { user })).toBe(user);
+    });
 
     it('myColoc lève une erreur sans coloc_id', async () => {
         await expect(
@@ -29,14 +43,20 @@ describe('resolvers.Query', () => {
         expect(result.id).toBe(COLOC_ID);
     });
 
-    it("usersByColoc refuse un membre d'une autre coloc", async () => {
+    it("usersByColoc refuse un membre d'une autre coloc et logge l'accès refusé", async () => {
+        const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
         await expect(
             resolvers.Query.usersByColoc(
                 null,
                 { colocId: COLOC_ID },
-                { user: { role: 'MEMBER', coloc_id: 'other' }, req },
+                { user: { id: 'u1', role: 'MEMBER', coloc_id: 'other' }, req },
             ),
         ).rejects.toThrow('Non autorisé');
+        expect(warnSpy).toHaveBeenCalledWith(
+            { userId: 'u1' },
+            expect.stringContaining('Accès refusé'),
+        );
+        warnSpy.mockRestore();
     });
 
     it('usersByColoc fusionne les scores karma', async () => {
@@ -109,13 +129,18 @@ describe('resolvers.Mutation', () => {
         expect(result.id).toBe('u1');
     });
 
-    it('login délègue à Domus', async () => {
-        mockAxios.post.mockResolvedValueOnce({ data: { token: 'tok' } });
-        const result = await resolvers.Mutation.login(null, {
-            email: 'a@test.com',
-            password: 'pw',
+    it('login délègue à Domus et pose le cookie httpOnly', async () => {
+        mockAxios.post.mockResolvedValueOnce({
+            data: { token: 'tok', user: { id: 'u1', email: 'a@test.com' } },
         });
-        expect(result.token).toBe('tok');
+        const res = mockRes();
+        const result = await resolvers.Mutation.login(
+            null,
+            { email: 'a@test.com', password: 'pw' },
+            { res },
+        );
+        expect(result.user.id).toBe('u1');
+        expect(res.cookie).toHaveBeenCalledWith('sodalis_token', 'tok', expect.any(Object));
     });
 
     it('createTask refuse un utilisateur non autorisé', async () => {
@@ -170,10 +195,18 @@ describe('resolvers.Mutation', () => {
         expect(mockCache.del).toHaveBeenCalledWith(`dashboard_coloc_${COLOC_ID}`);
     });
 
-    it('createColoc délègue à Domus', async () => {
-        mockAxios.post.mockResolvedValueOnce({ data: { id: COLOC_ID, name: 'Chez nous' } });
-        const result = await resolvers.Mutation.createColoc(null, { name: 'Chez nous' }, { req });
-        expect(result.id).toBe(COLOC_ID);
+    it('createColoc délègue à Domus et repose le cookie httpOnly', async () => {
+        mockAxios.post.mockResolvedValueOnce({
+            data: { coloc: { id: COLOC_ID, name: 'Chez nous' }, token: 'new-tok' },
+        });
+        const res = mockRes();
+        const result = await resolvers.Mutation.createColoc(
+            null,
+            { name: 'Chez nous' },
+            { req, res },
+        );
+        expect(result.coloc.id).toBe(COLOC_ID);
+        expect(res.cookie).toHaveBeenCalledWith('sodalis_token', 'new-tok', expect.any(Object));
     });
 
     it('joinColoc refuse un utilisateur non authentifié', async () => {
@@ -182,14 +215,47 @@ describe('resolvers.Mutation', () => {
         ).rejects.toThrow('Non autorisé');
     });
 
-    it('joinColoc délègue à Domus', async () => {
-        mockAxios.post.mockResolvedValueOnce({ data: { id: COLOC_ID } });
+    it('joinColoc délègue à Domus et repose le cookie httpOnly', async () => {
+        mockAxios.post.mockResolvedValueOnce({
+            data: { coloc: { id: COLOC_ID }, token: 'new-tok' },
+        });
+        const res = mockRes();
         const result = await resolvers.Mutation.joinColoc(
             null,
             { invite_code: 'abcd' },
-            { user: { id: 'u1' }, req },
+            { user: { id: 'u1' }, req, res },
         );
-        expect(result.id).toBe(COLOC_ID);
+        expect(result.coloc.id).toBe(COLOC_ID);
+        expect(res.cookie).toHaveBeenCalledWith('sodalis_token', 'new-tok', expect.any(Object));
+    });
+
+    it('logout révoque le jeton courant et efface le cookie', async () => {
+        const jwt = require('jsonwebtoken');
+        process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-secret';
+        const token = jwt.sign({ id: 'u1', jti: 'jti-1' }, process.env.JWT_SECRET, {
+            expiresIn: '1h',
+        });
+        const res = mockRes();
+        const result = await resolvers.Mutation.logout(
+            null,
+            null,
+            { req: { cookies: { sodalis_token: token } }, res },
+        );
+        expect(result).toBe(true);
+        expect(mockCache.setEx).toHaveBeenCalledWith(
+            'revoked_jwt:jti-1',
+            expect.any(Number),
+            '1',
+        );
+        expect(res.clearCookie).toHaveBeenCalledWith('sodalis_token', expect.any(Object));
+    });
+
+    it('logout efface simplement le cookie sans jeton', async () => {
+        const res = mockRes();
+        const result = await resolvers.Mutation.logout(null, null, { req: { cookies: {} }, res });
+        expect(result).toBe(true);
+        expect(mockCache.setEx).not.toHaveBeenCalled();
+        expect(res.clearCookie).toHaveBeenCalled();
     });
 
     it('updateTaskStatus délègue à Labor', async () => {
@@ -212,14 +278,25 @@ describe('resolvers.Mutation', () => {
         expect(mockCache.del).toHaveBeenCalledWith(`dashboard_coloc_${COLOC_ID}`);
     });
 
-    it('assignTicket invalide le cache dashboard', async () => {
+    it('assignTicket invalide le cache dashboard pour un ADMIN', async () => {
         mockAxios.patch.mockResolvedValueOnce({ data: { id: 'm1', coloc_id: COLOC_ID } });
         await resolvers.Mutation.assignTicket(
             null,
             { id: 'm1', assigned_to: 'u2' },
-            { user: { id: 'u1' }, req },
+            { user: { id: 'u1', role: 'ADMIN' }, req },
         );
         expect(mockCache.del).toHaveBeenCalledWith(`dashboard_coloc_${COLOC_ID}`);
+    });
+
+    it('assignTicket refuse un rôle MEMBER', async () => {
+        await expect(
+            resolvers.Mutation.assignTicket(
+                null,
+                { id: 'm1', assigned_to: 'u2' },
+                { user: { id: 'u1', role: 'MEMBER' }, req },
+            ),
+        ).rejects.toThrow('Réservé aux ADMINs');
+        expect(mockAxios.patch).not.toHaveBeenCalled();
     });
 
     it('createComplaint invalide le cache dashboard', async () => {

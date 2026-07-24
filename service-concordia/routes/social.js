@@ -21,6 +21,7 @@ function toPollObject(poll) {
 
 function checkColoc(user, coloc_id) {
     if (!user || (user.role !== 'ADMIN' && String(user.coloc_id) !== String(coloc_id))) {
+        logger.warn({ userId: user?.id }, 'Accès refusé — appartenance à une autre colocation');
         const err = new Error("Non autorisé — Vous n'appartenez pas à cette colocation");
         err.status = 403;
         throw err;
@@ -147,12 +148,28 @@ router.delete('/complaints/:id', async (req, res, next) => {
     }
 });
 
+const VALID_COMPLAINT_STATUSES = ['OPEN', 'RESOLVED'];
+
 router.get('/complaints', async (req, res, next) => {
     try {
         const { coloc_id, status, target_id } = req.query;
-        if (!coloc_id) return res.status(400).json({ error: 'coloc_id requis' });
+        if (!coloc_id || typeof coloc_id !== 'string') {
+            return res.status(400).json({ error: 'coloc_id requis' });
+        }
 
         checkColoc(req.user, coloc_id);
+
+        // status/target_id viennent de req.query : Express 5 utilise par défaut un
+        // query parser "simple" (pas de notation à crochets, donc pas d'objet injectable
+        // via ?status[$ne]=...), mais une clé répétée (?status=A&status=B) produit un
+        // tableau — sans ce contrôle de type, ce tableau serait injecté tel quel dans le
+        // filtre Mongoose.
+        if (status !== undefined && (typeof status !== 'string' || !VALID_COMPLAINT_STATUSES.includes(status))) {
+            return res.status(400).json({ error: 'status invalide' });
+        }
+        if (target_id !== undefined && typeof target_id !== 'string') {
+            return res.status(400).json({ error: 'target_id invalide' });
+        }
 
         const filter = { coloc_id };
         if (status) filter.status = status;

@@ -1,3 +1,4 @@
+const { randomUUID } = require('crypto');
 const { Router } = require('express');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
@@ -5,6 +6,7 @@ const rateLimit = require('express-rate-limit');
 const { body } = require('express-validator');
 const pool = require('../db');
 const validate = require('../middleware/validate');
+const logger = require('../logger');
 
 if (!process.env.JWT_SECRET) throw new Error('[FATAL] JWT_SECRET non défini — démarrage refusé');
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -17,6 +19,10 @@ const authLimiter = rateLimit({
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'Trop de tentatives — réessayez dans 15 minutes' },
+    handler: (req, res, _next, options) => {
+        logger.warn({ ip: req.ip }, 'Rate limit dépassé sur /auth');
+        res.status(options.statusCode).json(options.message);
+    },
 });
 
 // POST /auth/register — Inscription
@@ -65,14 +71,27 @@ router.post(
         }
 
         const token = jwt.sign(
-            { id: user.id, email: user.email, coloc_id: user.coloc_id, role: user.role },
+            {
+                id: user.id,
+                email: user.email,
+                coloc_id: user.coloc_id,
+                role: user.role,
+                name: user.name,
+                jti: randomUUID(),
+            },
             JWT_SECRET,
-            { expiresIn: '24h' },
+            { expiresIn: '24h', algorithm: 'HS256' },
         );
 
         res.json({
             token,
-            user: { id: user.id, name: user.name, email: user.email, role: user.role },
+            user: {
+                id: user.id,
+                name: user.name,
+                email: user.email,
+                role: user.role,
+                coloc_id: user.coloc_id,
+            },
         });
     },
 );

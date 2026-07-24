@@ -16,6 +16,54 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et ce pr
 
 ## [Non publié]
 
+Chantier 4 (Sécurité) : couverture des dix catégories OWASP Top 10, voir `SECURITY.md`.
+
+### Added
+
+- Helmet sur les quatre services, avec une CSP restrictive en production sur `api-gateway`
+  (permissive en développement pour l'Apollo Sandbox).
+- Rate limiting global sur `/graphql` (api-gateway) et sur les routes REST de
+  `service-concordia`, en plus du limiteur déjà présent sur `/auth`.
+- Limite de profondeur (`graphql-depth-limit`, 10 niveaux) et de complexité
+  (`graphql-query-complexity`, 1000) sur le schéma GraphQL ; introspection désactivée en
+  production.
+- Denylist Redis `revoked_jwt:<jti>` vérifiée par les quatre services, algorithme JWT épinglé
+  explicitement en HS256.
+- Migration du JWT vers un cookie `httpOnly`/`SameSite=Strict`/`Secure` sur `api-gateway`,
+  avec une mutation `logout` qui alimente la denylist à partir du TTL restant du jeton.
+- Query `me` pour réhydrater l'état d'authentification côté front depuis le cookie httpOnly
+  après un rechargement de page.
+- Authentification du handshake Socket.io et routage vers des rooms réelles par coloc et par
+  utilisateur (le canal de notification n'était auparavant qu'une convention côté client).
+- `.github/dependabot.yml` (écosystème npm par workspace + github-actions, hebdomadaire) et
+  épinglage de toutes les actions GitHub sur leur SHA de commit.
+- Identifiant de corrélation `x-request-id`, généré par la gateway si absent et propagé
+  jusqu'aux trois services aval via les en-têtes et `pino-http`.
+- Journalisation pino des échecs d'authentification, des refus d'accès (appartenance à une
+  autre coloc, rôle ADMIN requis) et des dépassements de rate limit, sans jamais journaliser
+  de mot de passe, de jeton ou de corps de requête d'authentification.
+- `SECURITY.md` : tableau OWASP Top 10 à dix lignes (catégorie, risque, mesure, fichier, test)
+  et section « Risques acceptés ».
+- Tests de sécurité : en-têtes Helmet, journalisation des refus d'accès, 429 sur rate limit,
+  403 sur `assignTicket` avec un rôle `MEMBER`, IDOR cross-coloc, longueur minimale de mot de
+  passe, rejet d'une requête GraphQL trop profonde.
+
+### Fixed
+
+- IDOR sur `GET /colocs/:id/users` (service-domus) : la route n'effectuait aucune vérification
+  d'appartenance à la coloc avant de renvoyer la liste des membres.
+- Défense en profondeur manquante sur `assignTicket` (api-gateway) : le contrôle du rôle ADMIN
+  n'existait que côté service-domus, pas au niveau de la gateway.
+- Filtre non validé sur `GET /api/complaints` (service-concordia) : une clé répétée dans la
+  query string pouvait être transmise sous forme de tableau au filtre Mongoose sans contrôle.
+- `package-lock.json` de chaque service régénéré : ils avaient dérivé après l'ajout des
+  nouvelles dépendances de sécurité, provoquant l'échec de `npm ci` dans les Dockerfiles.
+
+### Changed
+
+- `CLAUDE.md` mis à jour pour refléter le cookie httpOnly, la denylist Redis de révocation,
+  la propagation de `x-request-id` et l'authentification du handshake Socket.io.
+
 ## [1.0.1] - 2026-07-23
 
 ### Changed

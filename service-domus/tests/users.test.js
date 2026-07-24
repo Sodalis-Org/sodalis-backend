@@ -7,6 +7,7 @@ mockRequire(require, '../db', mockPool);
 mockRequire(require, '../redis-publisher', {
     publish: vi.fn(),
     del: vi.fn(),
+    get: vi.fn(),
     connect: vi.fn(),
     quit: vi.fn(),
 });

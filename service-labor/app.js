@@ -1,6 +1,7 @@
 require('dotenv').config();
 
 const express = require('express');
+const helmet = require('helmet');
 const pinoHttp = require('pino-http');
 const logger = require('./logger');
 const pool = require('./db');
@@ -9,7 +10,8 @@ const tasksRouter = require('./routes/tasks');
 function createApp() {
     const app = express();
 
-    app.use(pinoHttp({ logger }));
+    app.use(helmet());
+    app.use(pinoHttp({ logger, genReqId: (req) => req.headers['x-request-id'] }));
     app.use(express.json());
 
     app.use('/tasks', tasksRouter);

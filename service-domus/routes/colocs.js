@@ -1,3 +1,4 @@
+const { randomUUID } = require('crypto');
 const { Router } = require('express');
 const pool = require('../db');
 const jwt = require('jsonwebtoken');
@@ -5,6 +6,7 @@ const { body } = require('express-validator');
 const auth = require('../middleware/auth');
 const validate = require('../middleware/validate');
 const { generateInviteCode } = require('../utils/inviteCode');
+const logger = require('../logger');
 
 if (!process.env.JWT_SECRET) throw new Error('[FATAL] JWT_SECRET non défini — démarrage refusé');
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -44,9 +46,16 @@ router.post(
             await client.query('COMMIT');
 
             const token = jwt.sign(
-                { id: req.user.id, email: req.user.email, coloc_id: coloc.id, role: 'ADMIN' },
+                {
+                    id: req.user.id,
+                    email: req.user.email,
+                    name: req.user.name,
+                    coloc_id: coloc.id,
+                    role: 'ADMIN',
+                    jti: randomUUID(),
+                },
                 JWT_SECRET,
-                { expiresIn: '24h' },
+                { expiresIn: '24h', algorithm: 'HS256' },
             );
 
             res.status(201).json({ coloc, token });
@@ -89,9 +98,16 @@ router.post(
         await pool.query('UPDATE users SET coloc_id = $1 WHERE id = $2', [coloc.id, req.user.id]);
 
         const token = jwt.sign(
-            { id: req.user.id, email: req.user.email, coloc_id: coloc.id, role: req.user.role },
+            {
+                id: req.user.id,
+                email: req.user.email,
+                name: req.user.name,
+                coloc_id: coloc.id,
+                role: req.user.role,
+                jti: randomUUID(),
+            },
             JWT_SECRET,
-            { expiresIn: '24h' },
+            { expiresIn: '24h', algorithm: 'HS256' },
         );
 
         res.json({ coloc, token });
@@ -105,6 +121,10 @@ router.get('/:id', auth, async (req, res) => {
         return res.status(404).json({ error: 'Colocation introuvable' });
     }
     if (!req.user.coloc_id || String(req.user.coloc_id) !== colocId) {
+        logger.warn(
+            { userId: req.user.id },
+            'Accès refusé — détail de coloc hors de sa colocation',
+        );
         return res
             .status(403)
             .json({ error: "Non autorisé — Vous n'appartenez pas à cette colocation" });
@@ -123,6 +143,16 @@ router.get('/:id', auth, async (req, res) => {
 
 // GET /colocs/:id/users — Membres d'une coloc
 router.get('/:id/users', auth, async (req, res) => {
+    if (req.user.role !== 'ADMIN' && String(req.user.coloc_id) !== String(req.params.id)) {
+        logger.warn(
+            { userId: req.user.id },
+            'Accès refusé — liste des membres hors de sa colocation',
+        );
+        return res
+            .status(403)
+            .json({ error: "Non autorisé — Vous n'appartenez pas à cette colocation" });
+    }
+
     const { rows } = await pool.query(
         'SELECT id, name, email, role, harmony_score, created_at FROM users WHERE coloc_id = $1',
         [req.params.id],

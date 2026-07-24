@@ -158,8 +158,9 @@ Depuis une image en production jusqu'au commit et au run CI qui l'ont produite :
 2. **Add branch protection rule** → pattern `main`.
 3. Cocher **Require a pull request before merging**.
 4. Cocher **Require status checks to pass before merging**, puis sélectionner les checks
-   `quality`, `test`, `security`, `build` (et `lighthouse` côté frontend une fois rendu bloquant,
-   cf. tâche 5.5 du chantier 5).
+   `quality`, `test`, `security`, `build` côté backend, ainsi que `quality`, `test`, `security`,
+   `build` et `lighthouse` côté frontend — ce dernier est bloquant depuis la clôture du chantier 5
+   (accessibilité), voir `sodalis-frontend/ACCESSIBILITE.md`.
 5. Cocher **Do not allow bypassing the above settings** pour interdire le push direct, y compris
    aux administrateurs.
 6. **Save changes**.

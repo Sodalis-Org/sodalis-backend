@@ -6,6 +6,7 @@ mockRequire(require, '../db', mockPool);
 mockRequire(require, '../redis-publisher', {
     publish: vi.fn(),
     del: vi.fn(),
+    get: vi.fn(),
     connect: vi.fn(),
     quit: vi.fn(),
 });
@@ -49,6 +50,17 @@ describe('auth routes', () => {
         });
 
         expect(res.status).toBe(400);
+    });
+
+    it('POST /auth/register renvoie 400 pour un mot de passe de moins de 8 caractères', async () => {
+        const res = await request(app).post('/auth/register').send({
+            name: 'Alice',
+            email: 'alice@test.com',
+            password: '1234567',
+        });
+
+        expect(res.status).toBe(400);
+        expect(res.body.errors.some((e) => /8 caractères/.test(e.msg))).toBe(true);
     });
 
     it("POST /auth/register renvoie 409 si l'email existe déjà", async () => {
@@ -127,5 +139,22 @@ describe('auth routes', () => {
         mockPool.query.mockRejectedValueOnce(new Error('down'));
         const res = await request(app).get('/health');
         expect(res.status).toBe(503);
+    });
+
+    // Dernier test du fichier : le rate limiter /auth est un singleton au niveau du
+    // module, son compteur n'est jamais réinitialisé entre les tests précédents.
+    // 15 requêtes suffisent à dépasser la limite de 10, quel que soit le solde restant.
+    it('POST /auth/login renvoie 429 après dépassement du rate limit', async () => {
+        mockPool.query.mockResolvedValue({ rows: [] });
+
+        let lastStatus;
+        for (let i = 0; i < 15; i++) {
+            const res = await request(app)
+                .post('/auth/login')
+                .send({ email: 'ghost@test.com', password: 'password123' });
+            lastStatus = res.status;
+        }
+
+        expect(lastStatus).toBe(429);
     });
 });
