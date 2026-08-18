@@ -14,6 +14,16 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et ce pr
 - **CORRECTIF** : correction de bug, durcissement, documentation ou changement n'affectant pas le
   contrat public.
 
+## [1.1.0] - 2026-08-18
+
+### Fixed
+
+- **ANM-08** — IDOR cross-colocation via bypass `ADMIN` dans `api-gateway/resolvers.js` : un
+  ADMIN de la coloc B pouvait lire les données de la coloc A (membres, tâches, tickets, plaintes,
+  sondages, dashboard, karma, notifications). Correctif : helper `assertColocMembership` qui
+  compare `user.coloc_id` à la colocation ciblée, sans bypass par rôle. Test de non-régression
+  RF-COLOC-07 (`usersByColoc` + cas ADMIN cross-coloc). Closes #48.
+
 ## [Non publié]
 
 Chantier 4 (Sécurité) : couverture des dix catégories OWASP Top 10, voir `SECURITY.md`.
