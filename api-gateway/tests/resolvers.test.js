@@ -99,6 +99,16 @@ describe('resolvers.Query', () => {
         warnSpy.mockRestore();
     });
 
+    it("usersByColoc refuse un ADMIN d'une autre coloc (ANM-08 / RF-COLOC-07)", async () => {
+        await expect(
+            resolvers.Query.usersByColoc(
+                null,
+                { colocId: COLOC_ID },
+                { user: { id: 'admin-c', role: 'ADMIN', coloc_id: 'coloc-other' }, req },
+            ),
+        ).rejects.toThrow('Non autorisé');
+    });
+
     it('usersByColoc fusionne les scores karma', async () => {
         mockAxios.get
             .mockResolvedValueOnce({ data: [{ id: 'u1', name: 'Alice' }] })
@@ -118,9 +128,19 @@ describe('resolvers.Query', () => {
         const result = await resolvers.Query.tasksByColoc(
             null,
             { colocId: COLOC_ID },
-            { user: { role: 'ADMIN', coloc_id: 'other' }, req },
+            { user: { role: 'ADMIN', coloc_id: COLOC_ID }, req },
         );
         expect(result).toEqual([{ id: 't1' }]);
+    });
+
+    it("tasksByColoc refuse un ADMIN d'une autre coloc", async () => {
+        await expect(
+            resolvers.Query.tasksByColoc(
+                null,
+                { colocId: COLOC_ID },
+                { user: { role: 'ADMIN', coloc_id: 'other' }, req },
+            ),
+        ).rejects.toThrow('Non autorisé');
     });
 
     it('getColocDashboard renvoie le cache si présent', async () => {
@@ -484,14 +504,24 @@ describe('resolvers.Query — autorisations', () => {
         expect(result.data).toEqual([]);
     });
 
-    it('maintenanceTickets renvoie les tickets pour un ADMIN', async () => {
+    it('maintenanceTickets renvoie les tickets pour un ADMIN de la coloc', async () => {
         mockAxios.get.mockResolvedValueOnce({ data: [{ id: 'm1' }] });
         const result = await resolvers.Query.maintenanceTickets(
             null,
             { colocId: COLOC_ID },
-            { user: { role: 'ADMIN', coloc_id: 'other' }, req },
+            { user: { role: 'ADMIN', coloc_id: COLOC_ID }, req },
         );
         expect(result).toEqual([{ id: 'm1' }]);
+    });
+
+    it("maintenanceTickets refuse un ADMIN d'une autre coloc", async () => {
+        await expect(
+            resolvers.Query.maintenanceTickets(
+                null,
+                { colocId: COLOC_ID },
+                { user: { role: 'ADMIN', coloc_id: 'other' }, req },
+            ),
+        ).rejects.toThrow('Non autorisé');
     });
 
     it('complaints refuse un utilisateur non authentifié', async () => {
@@ -505,9 +535,19 @@ describe('resolvers.Query — autorisations', () => {
         const result = await resolvers.Query.polls(
             null,
             { colocId: COLOC_ID },
-            { user: { role: 'ADMIN', coloc_id: 'other' }, req },
+            { user: { role: 'ADMIN', coloc_id: COLOC_ID }, req },
         );
         expect(result).toEqual([{ id: 'p1' }]);
+    });
+
+    it("polls refuse un ADMIN d'une autre coloc", async () => {
+        await expect(
+            resolvers.Query.polls(
+                null,
+                { colocId: COLOC_ID },
+                { user: { role: 'ADMIN', coloc_id: 'other' }, req },
+            ),
+        ).rejects.toThrow('Non autorisé');
     });
 
     it("colocThanks refuse un membre d'une autre coloc", async () => {

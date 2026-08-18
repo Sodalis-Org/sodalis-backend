@@ -20,6 +20,13 @@ function forwardHeaders(req) {
     };
 }
 
+function assertColocMembership(user, colocId) {
+    if (!user || String(user.coloc_id) !== String(colocId)) {
+        logger.warn({ userId: user?.id }, "Accès refusé — appartenance à une autre colocation");
+        throw new Error("Non autorisé — Vous n'appartenez pas à cette colocation");
+    }
+}
+
 const resolvers = {
     Query: {
         // Rehydrate le contexte d'authentification côté client : le jeton vit dans un
@@ -97,13 +104,7 @@ const resolvers = {
         },
 
         usersByColoc: async (_, { colocId }, { user, req }) => {
-            if (!user || (user.role !== 'ADMIN' && user.coloc_id !== colocId)) {
-                logger.warn(
-                    { userId: user?.id },
-                    "Accès refusé — appartenance à une autre colocation",
-                );
-                throw new Error("Non autorisé — Vous n'appartenez pas à cette colocation");
-            }
+            assertColocMembership(user, colocId);
 
             const authHeader = forwardHeaders(req);
             const [usersRes, karmaRes] = await Promise.all([
@@ -120,13 +121,7 @@ const resolvers = {
         },
 
         notifications: async (_, { colocId, page = 1, limit = 20 }, { user, req }) => {
-            if (!user || (user.role !== 'ADMIN' && user.coloc_id !== colocId)) {
-                logger.warn(
-                    { userId: user?.id },
-                    "Accès refusé — appartenance à une autre colocation",
-                );
-                throw new Error("Non autorisé — Vous n'appartenez pas à cette colocation");
-            }
+            assertColocMembership(user, colocId);
 
             const { data } = await axios.get(
                 `${CONCORDIA_URL}/notifications/coloc/${colocId}?page=${page}&limit=${limit}`,
@@ -136,13 +131,7 @@ const resolvers = {
         },
 
         maintenanceTickets: async (_, { colocId }, { user, req }) => {
-            if (!user || (user.role !== 'ADMIN' && user.coloc_id !== colocId)) {
-                logger.warn(
-                    { userId: user?.id },
-                    "Accès refusé — appartenance à une autre colocation",
-                );
-                throw new Error("Non autorisé — Vous n'appartenez pas à cette colocation");
-            }
+            assertColocMembership(user, colocId);
 
             const { data } = await axios.get(`${DOMUS_URL}/maintenance?coloc_id=${colocId}`, {
                 headers: forwardHeaders(req),
@@ -151,13 +140,7 @@ const resolvers = {
         },
 
         tasksByColoc: async (_, { colocId }, { user, req }) => {
-            if (!user || (user.role !== 'ADMIN' && user.coloc_id !== colocId)) {
-                logger.warn(
-                    { userId: user?.id },
-                    "Accès refusé — appartenance à une autre colocation",
-                );
-                throw new Error("Non autorisé — Vous n'appartenez pas à cette colocation");
-            }
+            assertColocMembership(user, colocId);
 
             const { data } = await axios.get(`${LABOR_URL}/tasks/coloc/${colocId}`, {
                 headers: forwardHeaders(req),
@@ -166,13 +149,7 @@ const resolvers = {
         },
 
         complaints: async (_, { colocId }, { user, req }) => {
-            if (!user || (user.role !== 'ADMIN' && user.coloc_id !== colocId)) {
-                logger.warn(
-                    { userId: user?.id },
-                    "Accès refusé — appartenance à une autre colocation",
-                );
-                throw new Error("Non autorisé — Vous n'appartenez pas à cette colocation");
-            }
+            assertColocMembership(user, colocId);
             const { data } = await axios.get(
                 `${CONCORDIA_URL}/api/complaints?coloc_id=${colocId}`,
                 { headers: forwardHeaders(req) },
@@ -181,13 +158,7 @@ const resolvers = {
         },
 
         polls: async (_, { colocId }, { user, req }) => {
-            if (!user || (user.role !== 'ADMIN' && user.coloc_id !== colocId)) {
-                logger.warn(
-                    { userId: user?.id },
-                    "Accès refusé — appartenance à une autre colocation",
-                );
-                throw new Error("Non autorisé — Vous n'appartenez pas à cette colocation");
-            }
+            assertColocMembership(user, colocId);
             const { data } = await axios.get(`${CONCORDIA_URL}/api/polls?coloc_id=${colocId}`, {
                 headers: forwardHeaders(req),
             });
@@ -195,13 +166,7 @@ const resolvers = {
         },
 
         myRecentThanks: async (_, { colocId }, { user, req }) => {
-            if (!user || (user.role !== 'ADMIN' && user.coloc_id !== colocId)) {
-                logger.warn(
-                    { userId: user?.id },
-                    "Accès refusé — appartenance à une autre colocation",
-                );
-                throw new Error("Non autorisé — Vous n'appartenez pas à cette colocation");
-            }
+            assertColocMembership(user, colocId);
             const { data } = await axios.get(
                 `${CONCORDIA_URL}/api/karma/thanks?coloc_id=${colocId}`,
                 { headers: forwardHeaders(req) },
@@ -210,13 +175,7 @@ const resolvers = {
         },
 
         colocThanks: async (_, { colocId }, { user, req }) => {
-            if (!user || (user.role !== 'ADMIN' && user.coloc_id !== colocId)) {
-                logger.warn(
-                    { userId: user?.id },
-                    "Accès refusé — appartenance à une autre colocation",
-                );
-                throw new Error("Non autorisé — Vous n'appartenez pas à cette colocation");
-            }
+            assertColocMembership(user, colocId);
             const { data } = await axios.get(
                 `${CONCORDIA_URL}/api/karma/thanks/coloc/${colocId}`,
                 { headers: forwardHeaders(req) },
@@ -225,13 +184,7 @@ const resolvers = {
         },
 
         unreadNotificationsCount: async (_, { colocId }, { user, req }) => {
-            if (!user || (user.role !== 'ADMIN' && user.coloc_id !== colocId)) {
-                logger.warn(
-                    { userId: user?.id },
-                    "Accès refusé — appartenance à une autre colocation",
-                );
-                throw new Error("Non autorisé — Vous n'appartenez pas à cette colocation");
-            }
+            assertColocMembership(user, colocId);
             const { data } = await axios.get(
                 `${CONCORDIA_URL}/notifications/coloc/${colocId}/unread-count`,
                 { headers: forwardHeaders(req) },
@@ -240,13 +193,7 @@ const resolvers = {
         },
 
         getColocDashboard: async (_, { colocId }, { user, req }) => {
-            if (!user || (user.role !== 'ADMIN' && user.coloc_id !== colocId)) {
-                logger.warn(
-                    { userId: user?.id },
-                    "Accès refusé — appartenance à une autre colocation",
-                );
-                throw new Error("Non autorisé — Vous n'appartenez pas à cette colocation");
-            }
+            assertColocMembership(user, colocId);
 
             const cacheKey = `dashboard_coloc_${colocId}`;
 
@@ -393,13 +340,7 @@ const resolvers = {
         },
 
         createTask: async (_, { title, assignee_id, coloc_id, due_at }, { user, req }) => {
-            if (!user || (user.role !== 'ADMIN' && user.coloc_id !== coloc_id)) {
-                logger.warn(
-                    { userId: user?.id },
-                    "Accès refusé — appartenance à une autre colocation",
-                );
-                throw new Error("Non autorisé — Vous n'appartenez pas à cette colocation");
-            }
+            assertColocMembership(user, coloc_id);
             const { data } = await axios.post(
                 `${LABOR_URL}/tasks`,
                 { title, assignee_id, coloc_id, due_at },
@@ -547,9 +488,7 @@ const resolvers = {
         },
 
         markNotificationsRead: async (_, { colocId }, { user, req }) => {
-            if (!user || (user.role !== 'ADMIN' && user.coloc_id !== colocId)) {
-                throw new Error("Non autorisé — Vous n'appartenez pas à cette colocation");
-            }
+            assertColocMembership(user, colocId);
             await axios.post(
                 `${CONCORDIA_URL}/notifications/coloc/${colocId}/read`,
                 {},
