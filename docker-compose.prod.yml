@@ -215,12 +215,25 @@ services:
         networks:
             - sodalis-net
 
+    uptime-kuma:
+        image: louislam/uptime-kuma:1
+        container_name: sodalis_uptime_kuma
+        restart: always
+        volumes:
+            - uptime_kuma_data:/app/data
+        ports:
+            - "${UPTIME_KUMA_PORT:-3010}:3001"
+        networks:
+            - sodalis-net
+
 volumes:
     domus_data:
         driver: local
     labor_data:
         driver: local
     concordia_data:
+        driver: local
+    uptime_kuma_data:
         driver: local
 
 networks:

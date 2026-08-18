@@ -211,6 +211,23 @@ services:
         condition: service_healthy
       service-concordia:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://localhost:4000/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - sodalis-net
+
+  uptime-kuma:
+    image: louislam/uptime-kuma:1
+    container_name: sodalis_uptime_kuma
+    restart: unless-stopped
+    volumes:
+      - uptime_kuma_data:/app/data
+    ports:
+      - "${UPTIME_KUMA_PORT:-3010}:3001"
     networks:
       - sodalis-net
 
@@ -220,6 +237,8 @@ volumes:
   labor_data:
     driver: local
   concordia_data:
+    driver: local
+  uptime_kuma_data:
     driver: local
 
 networks:
