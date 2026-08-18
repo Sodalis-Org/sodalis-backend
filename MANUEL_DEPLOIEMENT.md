@@ -96,6 +96,8 @@ curl http://localhost:3003/health          # service-concordia
 
 Le démarrage complet de la stack est attendu en moins de 60 secondes (`npm run startup:check`, seuil documenté dans `QUALITY.md`).
 
+Supervision externe et alertes : voir [MONITORING.md](MONITORING.md) (Uptime Kuma sur `http://localhost:3010`).
+
 ## 8. Dépannage des erreurs fréquentes
 
 | Symptôme | Cause probable | Action |
