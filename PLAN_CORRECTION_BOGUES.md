@@ -2,7 +2,7 @@
 
 ## Résumé pour le dossier de certification
 
-Ce registre qualifie et trace les anomalies de Sodalis selon un processus en 8 états, avec deux échelles indépendantes (sévérité technique, criticité métier/sécurité). Il contient **9 anomalies** : 7 déjà détectées, corrigées et tracées dans l'historique Git (trois failles de sécurité réelles — contrôle d'accès défaillant, IDOR, injection —, deux incidents CI/livraison, et une erreur d'analyse méthodologique corrigée en audit accessibilité), et **2 découvertes aujourd'hui en exécutant réellement le `CAHIER_DE_RECETTES.md`** contre la stack Docker : ANM-08 (IDOR cross-coloc via bypass ADMIN) et ANM-09 (rate limiter aveugle à l'IP réelle du client). Ces deux dernières restent au statut « Détectée », non corrigées faute de temps avant la remise — **un cahier de recettes entièrement vert aurait été un problème, pas un succès**, et celui-ci ne l'est pas.
+Ce registre qualifie et trace les anomalies de Sodalis selon un processus en 8 états, avec deux échelles indépendantes (sévérité technique, criticité métier/sécurité). Il contient **10 anomalies** : 8 déjà détectées, corrigées et tracées dans l'historique Git (trois failles de sécurité réelles — contrôle d'accès défaillant, IDOR, injection —, deux incidents CI/livraison, une erreur d'analyse méthodologique corrigée en audit accessibilité, **un retour utilisateur support traité en bout-en-bout — ANM-10**), plus **ANM-09** (rate limiter) qui reste au statut « Détectée ».
 
 ---
 
@@ -55,6 +55,7 @@ Détectée ──▶ Qualifiée ──▶ Priorisée ──▶ En correction ─
 | ANM-07 | 2026-07-24 | Audit accessibilité | Deux contrastes d'icônes classés à tort non conformes (seuil texte 4,5:1 appliqué à des objets graphiques relevant du seuil 3:1) — analyse corrigée, script d'audit amendé | Cosmétique | Faible | `89a7d44` (sodalis-frontend) | Clôturée | Non publié (post-v1.0.0) |
 | ANM-08 | 2026-07-24 | Recette fonctionnelle (RF-COLOC-07, cette session) | IDOR cross-coloc via le bypass `role === 'ADMIN'` : tout utilisateur ADMIN (de **n'importe quelle** colocation) contourne la vérification d'appartenance et peut lire les données de **n'importe quelle autre** colocation (membres, tâches, tickets, plaintes, sondages, dashboard). Reproduit dans 12 resolvers de `api-gateway/resolvers.js` suivant le même motif | Majeure | Critique | PR #49 (issue #48) | Clôturée | v1.1.0 |
 | ANM-09 | 2026-07-24 | Recette fonctionnelle (RF-AUTH-11, cette session) | Le rate limiter `/auth` (10 req/15 min) est câblé sur `req.ip` côté `service-domus`, mais `api-gateway/resolvers.js` (`forwardHeaders`) ne transmet jamais l'IP cliente réelle aux services en aval — seulement `Authorization` et `x-request-id`. En production (seul le gateway est exposé), tous les appels `register`/`login` de **tous les utilisateurs confondus** sont donc vus comme venant de la même IP (celle du conteneur gateway), et partagent le même compteur de 10 requêtes/15 min : un pic d'usage légitime peut verrouiller l'inscription/connexion de toute l'application, pas seulement d'un attaquant isolé | Majeure | Élevée | Non corrigé à ce stade | Détectée | — |
+| ANM-10 | 2026-08-19 | Support utilisateur (session test local, e-mail) | Vote sur un sondage : en cas d'échec (sondage fermé entre-temps, erreur réseau/API), l'interface ne donne aucun retour — le clic semble ignoré, l'utilisateur croit que l'application est cassée | Mineure | Faible | fix/ANM-10-vote-poll-feedback (sodalis-frontend) | Clôturée | Non publié (post-v1.1.0) |
 
 *(Dates confirmées par `git show -s --format=%ci <hash>` sur chaque dépôt au moment de la rédaction.)*
 
@@ -119,10 +120,19 @@ Ces trois anomalies sont d'origine outillage/plateforme, pas des défauts du cod
 - **ANM-05** : `gitleaks-action@v2` nécessite une licence payante pour les dépôts sous organisation GitHub. Correctif : remplacement par le CLI MIT dans `.github/workflows/ci.yml` (backend `0ccbfe4`/`5e18a00`, frontend `5bf38d2`/`a9cc2fa`), avec un `.gitleaks.toml` d'allowlist pour les exemples de JWT en documentation.
 - **ANM-06** : les packages GHCR sont privés par défaut sous une organisation ; l'API de mise en visibilité publique renvoyait 404 avec le `GITHUB_TOKEN` du workflow. Correctif : suppression du job automatique inefficace (`9a13a40`, `2d57d89`), remplacé par une procédure manuelle documentée dans `DEPLOYMENT.md`.
 
+### ANM-10 — Vote sur sondage sans retour utilisateur en cas d'échec
+
+- **Contexte** : lors d'une session de test utilisateur local (parcours Concordia — voter sur un sondage), un testeur en rôle MEMBER a cliqué une option alors que le sondage venait d'être fermé par l'ADMIN. Aucun changement visuel, aucun message d'erreur.
+- **Signalement** : e-mail à `nerol.sessie@gmail.com`, transcrit en issue GitHub (modèle `bug_report.yml`). Voir [`SUPPORT_CASE_ANM10.md`](SUPPORT_CASE_ANM10.md).
+- **Cause racine** : `votePoll` dans `useConcordia.js` capturait l'erreur dans `console.error` sans la remonter à l'interface ; `PollFeedItem.jsx` n'avait ni état de chargement ni affichage d'erreur.
+- **Correctif** : `votePoll` retourne `{ ok, error }` ; `PollFeedItem` affiche un spinner pendant la mutation et un message `role="alert"` en cas d'échec.
+- **Test de non-régression** : `tests/hooks/useConcordia.test.jsx` (« votePoll returns ok:false when the mutation fails »).
+- **Vérification** : retest confirmé par le testeur (session locale, 2026-08-19).
+
 ## 5. Synthèse
 
-- **Répartition par sévérité** (9 anomalies au total) : 2 Bloquantes (ANM-04, 05) · 5 Majeures (ANM-01, 02, 06, 08, 09) · 1 Mineure (ANM-03) · 1 Cosmétique (ANM-07).
-- **Répartition par origine** : 3 audit sécurité · 2 CI · 1 livraison · 1 audit accessibilité · **2 recette fonctionnelle (cette session)**.
-- **Taux de correction** : 8/9 (89%) — ANM-08 clôturée en v1.1.0. **ANM-09 reste au statut Détectée**.
+- **Répartition par sévérité** (10 anomalies au total) : 2 Bloquantes (ANM-04, 05) · 5 Majeures (ANM-01, 02, 06, 08, 09) · 2 Mineures (ANM-03, 10) · 1 Cosmétique (ANM-07).
+- **Répartition par origine** : 3 audit sécurité · 2 CI · 1 livraison · 1 audit accessibilité · 2 recette fonctionnelle · **1 support utilisateur**.
+- **Taux de correction** : 9/10 (90%) — ANM-08 clôturée en v1.1.0, ANM-10 clôturée post-v1.1.0. **ANM-09 reste au statut Détectée**.
 - **Ce qui prouve que la recette n'a pas été bâclée** : ANM-08 est une vraie vulnérabilité de contrôle d'accès qu'aucun test existant ne couvrait — elle n'aurait jamais été trouvée sans une exécution réelle des scénarios contre la stack. Corrigée en v1.1.0 avec test de non-régression et rejeu RF-COLOC-07.
 - **Priorité immédiate** : traiter ANM-09 (majeure, disponibilité).

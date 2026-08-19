@@ -268,3 +268,9 @@ sodalis-backend/
 ├── .env.example
 └── testing_guide.md
 ```
+
+---
+
+## Support utilisateur
+
+Un problème en utilisant Sodalis ? Consultez [`SUPPORT.md`](SUPPORT.md) pour signaler un bug (formulaire GitHub ou e-mail), les délais de réponse et le processus de traitement.

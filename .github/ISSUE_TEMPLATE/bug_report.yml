@@ -1,0 +1,81 @@
+name: Signalement de bug
+description: Signaler un comportement incorrect dans Sodalis
+title: "[Bug] "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Merci de prendre quelques minutes pour décrire le problème.
+        Consultez [SUPPORT.md](../blob/main/SUPPORT.md) pour les délais de réponse et le déroulement du traitement.
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Étapes pour reproduire
+      description: Numérotez chaque étape (1., 2., 3.…)
+      placeholder: |
+        1. Me connecter en tant que MEMBER
+        2. Aller sur Corvées & maintenance
+        3. Cliquer sur « Nouveau ticket »
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Résultat attendu
+      description: Ce qui devrait se passer
+      placeholder: Le formulaire s'ouvre et je peux créer un ticket.
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Résultat obtenu
+      description: Ce qui s'est passé à la place
+      placeholder: Le bouton ne réagit pas / un message d'erreur apparaît.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: browser
+    attributes:
+      label: Navigateur
+      options:
+        - Chrome
+        - Firefox
+        - Safari
+        - Edge
+        - Autre
+    validations:
+      required: true
+
+  - type: input
+    id: browser_version
+    attributes:
+      label: Version du navigateur et OS
+      description: Ex. Chrome 131 / macOS 15, Firefox 128 / Windows 11
+      placeholder: Chrome 131 / macOS 15
+    validations:
+      required: true
+
+  - type: input
+    id: coloc_context
+    attributes:
+      label: Contexte colocation
+      description: Nom de la coloc et rôle (ADMIN ou MEMBER)
+      placeholder: Coloc « Les Lilas », rôle MEMBER
+    validations:
+      required: true
+
+  - type: textarea
+    id: screenshot
+    attributes:
+      label: Capture d'écran
+      description: Glissez une image dans le commentaire après création, ou collez un lien ici
+      placeholder: (optionnel) Lien ou description de la capture
+    validations:
+      required: false
