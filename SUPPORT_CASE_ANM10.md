@@ -108,7 +108,7 @@ CI run [#32228867580](https://github.com/Sodalis-Org/sodalis-frontend/actions/ru
 
 **Captures** : [`capture/support/anm-10/PR-14-checks-verts.png`](capture/support/anm-10/PR-14-checks-verts.png)
 
-**Version livrée** : correctif inclus dans la release frontend **v1.1.0** (2026-08-19).
+**Version livrée** : correctif inclus dans la release frontend [**v1.1.0**](https://github.com/Sodalis-Org/sodalis-frontend/releases/tag/v1.1.0) (2026-08-19). Capture release : `capture/support/anm-10/Release-v1.1.0-frontend.png` (à ajouter depuis la page GitHub Releases).
 
 ---
 
