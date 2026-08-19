@@ -106,9 +106,11 @@ CI run [#32228867580](https://github.com/Sodalis-Org/sodalis-frontend/actions/ru
 | Build | SUCCESS |
 | Performance & accessibilité (perf ≥ 90, a11y ≥ 95) | SUCCESS |
 
-**Captures** : [`capture/support/anm-10/PR-14-checks-verts.png`](capture/support/anm-10/PR-14-checks-verts.png)
+**Captures** :
+- PR #14 — [`PR-14-checks-verts.png`](capture/support/anm-10/PR-14-checks-verts.png)
+- Release v1.1.0 frontend — [`Release-v1.1.0-frontend.png`](capture/support/anm-10/Release-v1.1.0-frontend.png)
 
-**Version livrée** : correctif inclus dans la release frontend [**v1.1.0**](https://github.com/Sodalis-Org/sodalis-frontend/releases/tag/v1.1.0) (2026-08-19). Capture release : `capture/support/anm-10/Release-v1.1.0-frontend.png` (à ajouter depuis la page GitHub Releases).
+**Version livrée** : correctif inclus dans la release frontend [**v1.1.0**](https://github.com/Sodalis-Org/sodalis-frontend/releases/tag/v1.1.0) (2026-08-19).
 
 ---
 
