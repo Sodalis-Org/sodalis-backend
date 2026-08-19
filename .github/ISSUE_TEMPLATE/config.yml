@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Guide support utilisateur
+    url: https://github.com/Sodalis-Org/sodalis-backend/blob/main/SUPPORT.md
+    about: Délais de réponse, processus de traitement et contact e-mail
+  - name: Signaler par e-mail (sans compte GitHub)
+    url: mailto:nerol.sessie@gmail.com?subject=%5BSodalis%5D%20Signalement%20de%20bug
+    about: Décrivez le problème avec captures ; le support créera une issue pour le suivi
