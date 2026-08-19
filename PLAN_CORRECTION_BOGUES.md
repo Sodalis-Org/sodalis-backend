@@ -2,7 +2,7 @@
 
 ## Résumé pour le dossier de certification
 
-Ce registre qualifie et trace les anomalies de Sodalis selon un processus en 8 états, avec deux échelles indépendantes (sévérité technique, criticité métier/sécurité). Il contient **10 anomalies** : 8 déjà détectées, corrigées et tracées dans l'historique Git (trois failles de sécurité réelles — contrôle d'accès défaillant, IDOR, injection —, deux incidents CI/livraison, une erreur d'analyse méthodologique corrigée en audit accessibilité, **un retour utilisateur support traité en bout-en-bout — ANM-10**), plus **ANM-09** (rate limiter) qui reste au statut « Détectée ».
+Ce registre qualifie et trace les anomalies de Sodalis selon un processus en 8 états, avec deux échelles indépendantes (sévérité technique, criticité métier/sécurité). Il contient **11 anomalies** : 8 déjà détectées, corrigées et tracées dans l'historique Git (trois failles de sécurité réelles — contrôle d'accès défaillant, IDOR, injection —, deux incidents CI/livraison, une erreur d'analyse méthodologique corrigée en audit accessibilité, **un retour utilisateur support traité en bout-en-bout — ANM-10**), plus **ANM-09** (rate limiter) et **ANM-11** (codes d'erreur GraphQL) qui restent au statut « Détectée ».
 
 ---
 
@@ -56,6 +56,7 @@ Détectée ──▶ Qualifiée ──▶ Priorisée ──▶ En correction ─
 | ANM-08 | 2026-07-24 | Recette fonctionnelle (RF-COLOC-07, cette session) | IDOR cross-coloc via le bypass `role === 'ADMIN'` : tout utilisateur ADMIN (de **n'importe quelle** colocation) contourne la vérification d'appartenance et peut lire les données de **n'importe quelle autre** colocation (membres, tâches, tickets, plaintes, sondages, dashboard). Reproduit dans 12 resolvers de `api-gateway/resolvers.js` suivant le même motif | Majeure | Critique | PR #49 (issue #48) | Clôturée | v1.1.0 |
 | ANM-09 | 2026-07-24 | Recette fonctionnelle (RF-AUTH-11, cette session) | Le rate limiter `/auth` (10 req/15 min) est câblé sur `req.ip` côté `service-domus`, mais `api-gateway/resolvers.js` (`forwardHeaders`) ne transmet jamais l'IP cliente réelle aux services en aval — seulement `Authorization` et `x-request-id`. En production (seul le gateway est exposé), tous les appels `register`/`login` de **tous les utilisateurs confondus** sont donc vus comme venant de la même IP (celle du conteneur gateway), et partagent le même compteur de 10 requêtes/15 min : un pic d'usage légitime peut verrouiller l'inscription/connexion de toute l'application, pas seulement d'un attaquant isolé | Majeure | Élevée | Non corrigé à ce stade | Détectée | — |
 | ANM-10 | 2026-08-19 | Support utilisateur (session test local, e-mail) | Vote sur un sondage : en cas d'échec (sondage fermé entre-temps, erreur réseau/API), l'interface ne donne aucun retour — le clic semble ignoré, l'utilisateur croit que l'application est cassée | Mineure | Faible | PR #14 (sodalis-frontend) | Clôturée | v1.1.0 (frontend) |
+| ANM-11 | 2026-08-19 | Rejeu recette RF-COLOC-07 post-v1.1.0 | Refus d'accès cross-coloc fonctionnel (message « Non autorisé ») mais code GraphQL `INTERNAL_SERVER_ERROR` au lieu d'un code d'autorisation (`FORBIDDEN` / `UNAUTHORIZED`) | Cosmétique | Faible | Non corrigé | Détectée | — |
 
 *(Dates confirmées par `git show -s --format=%ci <hash>` sur chaque dépôt au moment de la rédaction.)*
 
@@ -129,10 +130,19 @@ Ces trois anomalies sont d'origine outillage/plateforme, pas des défauts du cod
 - **Test de non-régression** : `tests/hooks/useConcordia.test.jsx` (« votePoll returns ok:false when the mutation fails »).
 - **Vérification** : retest confirmé par le testeur (session locale, 2026-08-19).
 
+### ANM-11 — Codes d'erreur GraphQL non mappés (découverte lors du rejeu RF-COLOC-07)
+
+- **Contexte** : lors du rejeu manuel de RF-COLOC-07 après livraison v1.1.0, la requête cross-coloc est bien refusée avec le message attendu, mais la réponse GraphQL expose `"extensions": { "code": "INTERNAL_SERVER_ERROR" }` au lieu d'un code d'autorisation.
+- **Cause racine** : `assertColocMembership` et les autres contrôles d'accès lèvent un `Error` générique dans `api-gateway/resolvers.js` ; Apollo Server ne le mappe pas vers `FORBIDDEN` / `UNAUTHORIZED`.
+- **Impact** : cosmétique — le refus fonctionne ; un client ou un juré technique peut toutefois interpréter à tort une erreur serveur 500.
+- **Preuve** : capture [`preuve du bug corrigé.png`](capture/anm-08/preuve%20du%20bug%20corrigé.png).
+- **Correctif proposé (non appliqué)** : lever des `GraphQLError` avec `extensions.code` explicite, ou un `formatError` centralisé dans `api-gateway/app.js`.
+- **Statut** : Détectée, qualifiée. **Non corrigée** à ce stade.
+
 ## 5. Synthèse
 
-- **Répartition par sévérité** (10 anomalies au total) : 2 Bloquantes (ANM-04, 05) · 5 Majeures (ANM-01, 02, 06, 08, 09) · 2 Mineures (ANM-03, 10) · 1 Cosmétique (ANM-07).
-- **Répartition par origine** : 3 audit sécurité · 2 CI · 1 livraison · 1 audit accessibilité · 2 recette fonctionnelle · **1 support utilisateur**.
-- **Taux de correction** : 9/10 (90 %) — ANM-08 clôturée en v1.1.0 (backend), ANM-10 clôturée en v1.1.0 (frontend). **ANM-09 reste au statut Détectée**.
-- **Ce qui prouve que la recette n'a pas été bâclée** : ANM-08 est une vraie vulnérabilité de contrôle d'accès qu'aucun test existant ne couvrait — elle n'aurait jamais été trouvée sans une exécution réelle des scénarios contre la stack. Corrigée en v1.1.0 avec test de non-régression et rejeu RF-COLOC-07.
+- **Répartition par sévérité** (11 anomalies au total) : 2 Bloquantes (ANM-04, 05) · 5 Majeures (ANM-01, 02, 06, 08, 09) · 2 Mineures (ANM-03, 10) · 2 Cosmétiques (ANM-07, 11).
+- **Répartition par origine** : 3 audit sécurité · 2 CI · 1 livraison · 1 audit accessibilité · 2 recette fonctionnelle · **1 support utilisateur** · 1 relecture critique post-recette.
+- **Taux de correction** : 9/11 (82 %) — ANM-08 clôturée en v1.1.0 (backend), ANM-10 clôturée en v1.1.0 (frontend). **ANM-09 et ANM-11 restent au statut Détectée**.
+- **Ce qui prouve que la recette n'a pas été bâclée** : ANM-08 est une vraie vulnérabilité de contrôle d'accès qu'aucun test existant ne couvrait — elle n'aurait jamais été trouvée sans une exécution réelle des scénarios contre la stack. Corrigée en v1.1.0 avec test de non-régression et rejeu RF-COLOC-07. **ANM-11** montre une relecture critique des preuves (code d'erreur GraphQL), sur le même modèle qu'ANM-07.
 - **Priorité immédiate** : traiter ANM-09 (majeure, disponibilité).

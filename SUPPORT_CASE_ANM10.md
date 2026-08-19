@@ -74,7 +74,7 @@ Document de traçabilité pour la boucle de support (étape 3 certification). Co
 ## 6. Correctif
 
 **Dépôt :** `sodalis-frontend`  
-**Branche :** `fix/ANM-10-vote-poll-feedback`
+**Branche :** `dev` (PR #14 mergée `dev` → `main`, commit `4cc920b`)
 
 | Fichier | Changement |
 |---|---|
@@ -96,7 +96,7 @@ La CI frontend (`sodalis-frontend/.github/workflows/ci.yml`) exécute avant merg
 
 **Résultat constaté (2026-08-19)** : PR [#14](https://github.com/Sodalis-Org/sodalis-frontend/pull/14) « fix: retour utilisateur vote sondage (ANM-10) » mergée dans `main` (commit `4cc920b`).
 
-CI run [#32228867580](https://github.com/Sodalis-Org/sodalis-frontend/actions/runs/32228867580) — **5/5 jobs SUCCESS** :
+CI run [#32228867580](https://github.com/Sodalis-Org/sodalis-frontend/actions/runs/32228867580) — **5 jobs SUCCESS, 10 checks GitHub passed** (GitHub compte aussi les checks auxiliaires : upload artifact, etc.) :
 
 | Job | Résultat |
 |---|---|
@@ -107,6 +107,7 @@ CI run [#32228867580](https://github.com/Sodalis-Org/sodalis-frontend/actions/ru
 | Performance & accessibilité (perf ≥ 90, a11y ≥ 95) | SUCCESS |
 
 **Captures** :
+- Issue #52 fermée — [`Issue-52-fermee.png`](capture/support/anm-10/Issue-52-fermee.png)
 - PR #14 — [`PR-14-checks-verts.png`](capture/support/anm-10/PR-14-checks-verts.png)
 - Release v1.1.0 frontend — [`Release-v1.1.0-frontend.png`](capture/support/anm-10/Release-v1.1.0-frontend.png)
 
@@ -121,7 +122,7 @@ CI run [#32228867580](https://github.com/Sodalis-Org/sodalis-frontend/actions/ru
 | Corrigée | Oui |
 | Test de non-régression ajouté | Oui |
 | Vérifiée (retest utilisateur) | Oui — confirmation J+1 |
-| Clôturée | Oui — 2026-08-19 |
+| Clôturée | Oui — issue [#52](https://github.com/Sodalis-Org/sodalis-backend/issues/52) fermée le 2026-08-20 sur GitHub |
 
 ---
 

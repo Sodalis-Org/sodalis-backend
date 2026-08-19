@@ -146,7 +146,9 @@ Depuis une image en production jusqu'au commit et au run CI qui l'ont produite :
 4. La page **Packages** du dépôt (GHCR) liste, pour chaque image, l'historique de ses tags avec la
    date de publication, permettant de recouper avec le run CI correspondant.
 
-![Liste des packages GHCR](docs/captures/ghcr-packages.png)
+![Tags v1.1.0 — sodalis-api-gateway sur GHCR](capture/anm-08/GHCR-api-gateway-v1.1.0.png)
+
+(Vue liste des 4 packages : [`Packages GHCR.png`](capture/anm-08/Packages%20GHCR.png).)
 
 ---
 
