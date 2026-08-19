@@ -51,7 +51,7 @@ Document de traçabilité pour la boucle de support (étape 3 certification). Co
 | **Priorité** | Normale (UX, pas de perte de données) |
 | **Statut initial** | Détectée → Qualifiée → Priorisée |
 
-**Transcription issue GitHub** (créée par le support à partir de l'e-mail) :
+**Transcription issue GitHub** : issue #52 (créée par le support à partir de l'e-mail) :
 
 - **Titre :** `[Bug] Vote sur sondage sans retour visuel en cas d'échec`
 - **Template :** `bug_report.yml`
