@@ -135,14 +135,40 @@ docker compose start service-concordia
 
 **Astuce démo** : le jour J, passer temporairement l'intervalle à **30 s** sur la sonde testée → alerte en ~90 s au lieu de 3 min. Remettre 60 s ensuite (valeur documentée).
 
-**Captures à conserver** (`capture/monitoring/` ou dossier `capture/` du projet) :
+**Captures à conserver** (`capture/monitoring/`) :
 
-1. Dashboard Kuma : sonde `service-concordia` en rouge + historique de disponibilité
-2. E-mail d'alerte reçu (objet, horodatage, nom du monitor) — ou message Discord si Plan B
+1. Dashboard Kuma : sonde `service-concordia` en rouge + historique de disponibilité — [`Dashboard-kuma-rouge.png`](capture/monitoring/Dashboard-kuma-rouge.png)
+2. E-mail d'alerte reçu (objet, horodatage, nom du monitor) — [`email-recu-a-cause-du-service-down.png`](capture/monitoring/email-recu-a-cause-du-service-down.png) — ou message Discord si Plan B
+3. Graphique **Response Time** d'une sonde HTTP (preuve supervision latence) — [`kuma-response-time.png`](capture/monitoring/kuma-response-time.png)
 
 ---
 
-## 6. Limites assumées
+## 6. Indicateurs de qualité et de performance supervisés
+
+Ce tableau répond au critère **C4.1.2** : critères de qualité et de performance adaptés au projet, avec outil de mesure, fréquence et action en cas de dépassement. Les seuils détaillés (couverture, lint, audit, Lighthouse frontend) sont dans [QUALITY.md](QUALITY.md) (backend) et [QUALITY.md](../sodalis-frontend/QUALITY.md) (frontend).
+
+| Indicateur | Seuil | Outil | Fréquence | Dernière mesure (2026-08-19) | Action si dépassement |
+|---|---|---|---|---|---|
+| Disponibilité stack (8 services) | Alerte après 3 échecs consécutifs (× 60 s) | Uptime Kuma — sondes §3 | Continue (24/7) | — | Alerte SMTP ; investigation + `docker compose ps` |
+| Temps de réponse `/health` (4 sondes HTTP) | < 500 ms (cible opérationnelle) | Uptime Kuma — graphique **Response Time** par monitor | Continue (60 s) | Voir [`kuma-response-time.png`](capture/monitoring/kuma-response-time.png) | Revue opérationnelle si latence persistante > 500 ms ; corréler avec charge hôte |
+| P95 `getColocDashboard` (GraphQL) | < 200 ms | [`scripts/perf-check.js`](scripts/perf-check.js) (`PERF_P95_THRESHOLD_MS=200`) | Manuel : `npm run perf:check` ou workflow [`perf.yml`](.github/workflows/perf.yml) | **P95 ~6 ms** (moy. 2,4 ms — coloc de test vide, latence conforme) | Investiguer régression gateway / services internes |
+| Démarrage stack complète | < 60 s | [`scripts/startup-check.sh`](scripts/startup-check.sh) (`STARTUP_THRESHOLD_S=60`) | Manuel : `npm run startup:check` ou `perf.yml` | **25 s** (tous conteneurs `healthy`) | Vérifier healthchecks Docker, logs de démarrage, ressources hôte |
+| Couverture de tests | ≥ 60 % lignes | Vitest coverage | CI — chaque push/PR | Conforme (cf. QUALITY.md) | Corriger ou étendre les tests avant merge |
+| Erreurs de lint | 0 | ESLint | CI — chaque push/PR | Gate bloquant | Corriger avant merge |
+| Vulnérabilités dépendances | 0 high/critical | `npm audit` (job `security`) | CI — chaque push/PR | Exit code 0 | `npm audit fix` ou mise à jour manuelle |
+| Lighthouse (frontend) | perf ≥ 90, a11y ≥ 95 | Lighthouse CI | CI — chaque push/PR | 0,98 / 1,0 (cf. QUALITY.md frontend) | Corriger régression avant merge |
+
+**Commandes de vérification manuelle** (stack Docker démarrée) :
+
+```bash
+cd sodalis-backend
+npm run startup:check   # redémarre la stack et mesure le temps jusqu'à healthy
+npm run perf:check      # mesure le P95 getColocDashboard (stack déjà up)
+```
+
+---
+
+## 7. Limites assumées
 
 | Limite | Explication |
 |---|---|
@@ -155,8 +181,9 @@ docker compose start service-concordia
 
 ---
 
-## 7. Références
+## 8. Références
 
+- Critères de qualité et seuils chiffrés : [QUALITY.md](QUALITY.md) (backend), [QUALITY.md](../sodalis-frontend/QUALITY.md) (frontend)
 - Healthchecks Docker : [docker-compose.yml](docker-compose.yml), [docker-compose.prod.yml](docker-compose.prod.yml)
 - Endpoints `/health` : `api-gateway`, `service-domus`, `service-labor`, `service-concordia`
 - Déploiement et vérification de démarrage : [MANUEL_DEPLOIEMENT.md](MANUEL_DEPLOIEMENT.md) section 7

@@ -1,6 +1,6 @@
 # Critères de qualité et de performance — sodalis-backend
 
-Ce document liste les seuils chiffrés retenus pour ce backend, les outils qui les mesurent, et la commande exacte pour les vérifier. Tous les seuils sont pilotables depuis la racine du repo via les workspaces npm.
+Ce document liste les seuils chiffrés retenus pour ce backend, les outils qui les mesurent, et la commande exacte pour les vérifier. Tous les seuils sont pilotables depuis la racine du repo via les workspaces npm. **Supervision runtime** (disponibilité, latence `/health`, fréquence des mesures) : voir [MONITORING.md](MONITORING.md) §6.
 
 | Critère | Seuil | Outil | Commande |
 |---|---|---|---|
