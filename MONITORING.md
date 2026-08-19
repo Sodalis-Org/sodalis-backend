@@ -80,6 +80,8 @@ Pour chaque ligne du tableau ci-dessus :
 7. **Notifications** : cocher la notification e-mail (cf. 4.2)
 8. Enregistrer
 
+Capture de référence (intervalle, retries, notification) : [`Kuma-edit-monitor.png`](capture/monitoring/Kuma-edit-monitor.png).
+
 Les sondes utilisent les **noms de service Docker** (`api-gateway`, `domus-db`, etc.), pas `localhost` — Kuma interroge le réseau interne `sodalis-net`.
 
 ### 4.2 Notification Gmail (canal principal)
@@ -138,8 +140,9 @@ docker compose start service-concordia
 **Captures à conserver** (`capture/monitoring/`) :
 
 1. Dashboard Kuma : sonde `service-concordia` en rouge + historique de disponibilité — [`Dashboard-kuma-rouge.png`](capture/monitoring/Dashboard-kuma-rouge.png)
-2. E-mail d'alerte reçu (objet, horodatage, nom du monitor) — [`email-recu-a-cause-du-service-down.png`](capture/monitoring/email-recu-a-cause-du-service-down.png) — ou message Discord si Plan B
+2. E-mail d'alerte reçu (objet, horodatage, nom du monitor) — [`email-recu-a-cause-du-service-down.png`](capture/monitoring/email-recu-a-cause-du-service-down.png) — test d'incident du **2026-08-18** ; ou message Discord si Plan B
 3. Graphique **Response Time** d'une sonde HTTP (preuve supervision latence) — [`kuma-response-time.png`](capture/monitoring/kuma-response-time.png)
+4. Écran d'édition d'une sonde (intervalle 60 s, retries 3, notification cochée) — [`Kuma-edit-monitor.png`](capture/monitoring/Kuma-edit-monitor.png)
 
 ---
 
@@ -147,7 +150,9 @@ docker compose start service-concordia
 
 Ce tableau répond au critère **C4.1.2** : critères de qualité et de performance adaptés au projet, avec outil de mesure, fréquence et action en cas de dépassement. Les seuils détaillés (couverture, lint, audit, Lighthouse frontend) sont dans [QUALITY.md](QUALITY.md) (backend) et [QUALITY.md](../sodalis-frontend/QUALITY.md) (frontend).
 
-| Indicateur | Seuil | Outil | Fréquence | Dernière mesure (2026-08-19) | Action si dépassement |
+**Note dates** : le test d'alerte SMTP (§5, capture e-mail) date du **2026-08-18** ; le relevé indicateurs perf/P95/startup ci-dessous date du **2026-08-19** — deux mesures distinctes.
+
+| Indicateur | Seuil | Outil | Fréquence | Dernière mesure | Action si dépassement |
 |---|---|---|---|---|---|
 | Disponibilité stack (8 services) | Alerte après 3 échecs consécutifs (× 60 s) | Uptime Kuma — sondes §3 | Continue (24/7) | — | Alerte SMTP ; investigation + `docker compose ps` |
 | Temps de réponse `/health` (4 sondes HTTP) | < 500 ms (cible opérationnelle) | Uptime Kuma — graphique **Response Time** par monitor | Continue (60 s) | Voir [`kuma-response-time.png`](capture/monitoring/kuma-response-time.png) | Revue opérationnelle si latence persistante > 500 ms ; corréler avec charge hôte |
