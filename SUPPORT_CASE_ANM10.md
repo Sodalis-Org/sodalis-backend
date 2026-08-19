@@ -92,8 +92,23 @@ La CI frontend (`sodalis-frontend/.github/workflows/ci.yml`) exécute avant merg
 - tests + couverture (job `test`)
 - audit dépendances + gitleaks (job `security`)
 - build (job `build`)
+- Lighthouse perf ≥ 90 / a11y ≥ 95 (job `lighthouse`)
 
-**Résultat attendu :** pipeline verte sur la PR — gate bloquante avant clôture ANM-10.
+**Résultat constaté (2026-08-19)** : PR [#14](https://github.com/Sodalis-Org/sodalis-frontend/pull/14) « fix: retour utilisateur vote sondage (ANM-10) » mergée dans `main` (commit `4cc920b`).
+
+CI run [#32228867580](https://github.com/Sodalis-Org/sodalis-frontend/actions/runs/32228867580) — **5/5 jobs SUCCESS** :
+
+| Job | Résultat |
+|---|---|
+| Lint & format | SUCCESS |
+| Tests & coverage | SUCCESS |
+| Dependency audit & secret scan | SUCCESS |
+| Build | SUCCESS |
+| Performance & accessibilité (perf ≥ 90, a11y ≥ 95) | SUCCESS |
+
+**Captures** : [`capture/support/anm-10/PR-14-checks-verts.png`](capture/support/anm-10/PR-14-checks-verts.png)
+
+**Version livrée** : correctif inclus dans la release frontend **v1.1.0** (2026-08-19).
 
 ---
 

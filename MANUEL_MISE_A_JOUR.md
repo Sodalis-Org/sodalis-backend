@@ -101,15 +101,21 @@ GHCR_OWNER=<owner> SODALIS_VERSION=<version_précédente> \
 
 ## 8. Mise à jour des dépendances
 
-- **Dependabot** (`.github/dependabot.yml`) ouvre automatiquement des pull requests hebdomadaires pour chaque écosystème `npm` (racine + 4 workspaces) et pour les actions GitHub — ces PR passent par la même CI que tout changement (lint, tests, audit, build).
-- **Audit ponctuel** : `npm run audit` (racine, tous workspaces) doit rester à 0 vulnérabilité haute ou critique — c'est un job bloquant en CI (`security`), donc toute dépendance vulnérable introduite est détectée avant merge, pas seulement lors d'un audit manuel a posteriori.
+Politique unique — fréquence, périmètre et mode (automatique ou manuel) :
 
-## 9. Fréquence recommandée
+| Mécanisme | Fréquence | Périmètre logiciel | Type | Suite |
+|---|---|---|---|---|
+| **Dependabot** | Hebdomadaire | **Backend** : npm racine + 4 workspaces (`api-gateway`, `service-domus`, `service-labor`, `service-concordia`) + actions GitHub — cf. [`.github/dependabot.yml`](.github/dependabot.yml). **Frontend** : npm racine + actions GitHub — cf. [`sodalis-frontend/.github/dependabot.yml`](../sodalis-frontend/.github/dependabot.yml) | **Automatique** (PR ouverte) | Merge **manuel** après CI verte (lint, tests, audit, build) |
+| **`npm audit` (job `security`)** | Chaque push / PR | Tous les workspaces npm des 2 dépôts | **Automatique bloquant** | Échec CI si vulnérabilité high/critical ; corriger avant merge |
+| **Montée de version applicative** | À la demande (correctif sécurité : dès CI OK) | Images GHCR backend (`SODALIS_VERSION`) ; build frontend séparé | **Manuel** | Procédure §3 + recette ciblée (`CAHIER_DE_RECETTES.md`) |
+| **Montée majeure de dépendances** (ex. React 19) | À la demande | Package cible | **Manuel** | PR dédiée + recette ; Dependabot peut proposer, merge refusé si CI rouge |
 
-- **Correctifs de sécurité** (Dependabot, alertes `npm audit`) : appliqués dès qu'une pull request Dependabot passe la CI, sans attendre un cycle de version planifié.
-- **Montées de version mineure/correctif** : au fil de l'eau, dès publication, en suivant la procédure de la section 3 — le risque est faible (pas de rupture de contrat par définition).
-- **Montées de version majeure** : planifiées, avec relecture du `CHANGELOG.md` et un passage complet (ou au moins ciblé) du `CAHIER_DE_RECETTES.md` avant et après, en raison du risque de rupture de compatibilité.
+**Fréquence recommandée en pratique** :
 
-## 10. Justification des choix
+- **Correctifs de sécurité** (Dependabot, alertes `npm audit`) : appliqués dès qu'une PR Dependabot passe la CI, sans attendre un cycle de version planifié.
+- **Montées de version mineure/correctif applicative** : au fil de l'eau, dès publication, en suivant la procédure de la section 3.
+- **Montées de version majeure applicative** : planifiées, avec relecture du `CHANGELOG.md` et passage ciblé ou complet du `CAHIER_DE_RECETTES.md`.
+
+## 9. Justification des choix
 
 Ce manuel s'appuie sur les décisions documentées dans `ARCHITECTURE.md`, section 9. Le versionnement SemVer strict et l'immuabilité des images GHCR (jamais `latest`, cf. `DEPLOYMENT.md` section 4 et `SECURITY.md` A08) sont ce qui rend le retour arrière de la section 7 possible sans reconstruction : chaque version déployée reste disponible indéfiniment sur le registre, identifiable par son tag exact.
