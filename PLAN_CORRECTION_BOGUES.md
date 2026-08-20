@@ -103,6 +103,10 @@ Détectée ──▶ Qualifiée ──▶ Priorisée ──▶ En correction ─
 - **Ampleur** : le même motif est utilisé pour `myColoc`, `usersByColoc`, `tasksByColoc`, `getColocDashboard`, `maintenanceTickets`, `notifications`, `complaints`, `polls`, `myRecentThanks`, `colocThanks`, `unreadNotificationsCount`, `createTask`, `markNotificationsRead`, etc. — un utilisateur ADMIN d'une coloc quelconque peut potentiellement lire (voire, pour certaines mutations, écrire) dans n'importe quelle autre colocation.
 - **Correctif appliqué (v1.1.0)** : helper `assertColocMembership(user, colocId)` dans `api-gateway/resolvers.js` — compare `String(user.coloc_id)` à `String(colocId)` sans bypass par rôle, appliqué aux 12 resolvers concernés.
 - **Test de non-régression** : `api-gateway/tests/resolvers.test.js` — cas « ADMIN d'une autre coloc » sur `usersByColoc`, `tasksByColoc`, `maintenanceTickets`, `polls` (RF-COLOC-07).
+- **Traçabilité GitHub** :
+  - **Issue [#48](https://github.com/Sodalis-Org/sodalis-backend/issues/48)** : fiche d'**analyse d'anomalie de sécurité** (contexte, cause racine, ampleur, correctif) — pas une fiche de reproduction utilisateur.
+  - **Reproduction** : scénario **RF-COLOC-07** dans `CAHIER_DE_RECETTES.md` + capture [`preuve du bug corrigé.png`](capture/anm-08/preuve%20du%20bug%20corrigé.png).
+  - **PR #49** + release v1.1.0 : livraison. Capture issue fermée : [`Issue ANM-08 (fermée).png`](capture/anm-08/Issue%20ANM-08%20(fermée).png) (issue #48 — analyse sécurité ANM-08).
 - **Statut** : Clôturée — corrigée, testée, livrée en v1.1.0 (issue #48).
 
 ### ANM-09 — Rate limiter `/auth` aveugle à l'IP réelle du client (découverte pendant cette recette)

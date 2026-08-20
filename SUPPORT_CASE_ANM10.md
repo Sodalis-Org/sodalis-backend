@@ -51,7 +51,7 @@ Document de traçabilité pour la boucle de support (étape 3 certification). Co
 | **Priorité** | Normale (UX, pas de perte de données) |
 | **Statut initial** | Détectée → Qualifiée → Priorisée |
 
-**Transcription issue GitHub** : issue #52 (créée par le support à partir de l'e-mail) :
+**Fiche de consignation GitHub** : issue [#52](https://github.com/Sodalis-Org/sodalis-backend/issues/52) (créée par le support à partir de l'e-mail) — remplit le critère « contient les informations permettant de reproduire le bogue » (trois étapes numérotées du template `bug_report.yml`). À distinguer de l'issue [#48](https://github.com/Sodalis-Org/sodalis-backend/issues/48) (ANM-08), qui documente une **analyse d'anomalie de sécurité** sans étapes utilisateur.
 
 - **Titre :** `[Bug] Vote sur sondage sans retour visuel en cas d'échec`
 - **Template :** `bug_report.yml`

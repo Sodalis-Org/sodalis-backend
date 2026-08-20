@@ -44,7 +44,7 @@ GHCR_OWNER=<owner> SODALIS_VERSION=v1.1.0 \
 # 6. Vérifier (section 6)
 ```
 
-Aucune reconstruction locale n'est nécessaire : les images sont déjà construites et publiées sur GHCR par le pipeline de livraison (`release.yml`), taguées par version SemVer et par SHA court, jamais `latest`.
+Aucune reconstruction locale n'est nécessaire : les images sont déjà construites et publiées sur GHCR par le pipeline de livraison (`release.yml`), taguées par version SemVer et par SHA court (politique `latest` : cf. `DEPLOYMENT.md` section 4).
 
 ## 4. Sauvegarde préalable des volumes de données
 
@@ -118,4 +118,4 @@ Politique unique — fréquence, périmètre et mode (automatique ou manuel) :
 
 ## 9. Justification des choix
 
-Ce manuel s'appuie sur les décisions documentées dans `ARCHITECTURE.md`, section 9. Le versionnement SemVer strict et l'immuabilité des images GHCR (jamais `latest`, cf. `DEPLOYMENT.md` section 4 et `SECURITY.md` A08) sont ce qui rend le retour arrière de la section 7 possible sans reconstruction : chaque version déployée reste disponible indéfiniment sur le registre, identifiable par son tag exact.
+Ce manuel s'appuie sur les décisions documentées dans `ARCHITECTURE.md`, section 9. Le versionnement SemVer strict et l'immuabilité des images GHCR (politique `latest` : cf. `DEPLOYMENT.md` section 4 et `SECURITY.md` A08) sont ce qui rend le retour arrière de la section 7 possible sans reconstruction : chaque version déployée reste disponible indéfiniment sur le registre, identifiable par son tag exact.
